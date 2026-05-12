@@ -3,9 +3,9 @@
 # =============================================================================
 # Quick Start:
 #   1. Copy .env.example to .env and configure
-#   2. docker-compose up -d
+#   2. docker compose up -d --build
 #   3. Check logs: docker-compose logs -f sub2api
-#   4. Access: http://localhost:8080
+#   4. Access: http://localhost:8090
 #
 # All configuration is done via environment variables.
 # No Setup Wizard needed - the system auto-initializes on first run.
@@ -16,15 +16,20 @@ services:
   # Sub2API Application
   # ===========================================================================
   sub2api:
-    image: weishaw/sub2api:latest
-    container_name: sub2api
+    image: pragmaticplay-admin:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_GAME_SERVICE_BASE_URL: ${VITE_GAME_SERVICE_BASE_URL:-http://127.0.0.1:3100}
+    container_name: pragmaticplay-admin
     restart: unless-stopped
     ulimits:
       nofile:
         soft: 100000
         hard: 100000
     ports:
-      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
+      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8090}:8080"
     volumes:
       # Data persistence (config.yaml will be auto-generated here)
       - sub2api_data:/app/data
@@ -183,7 +188,7 @@ services:
   # ===========================================================================
   postgres:
     image: postgres:18-alpine
-    container_name: sub2api-postgres
+    container_name: pragmaticplay-admin-postgres
     restart: unless-stopped
     ulimits:
       nofile:
@@ -212,8 +217,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    ports:
-      - 5432:5432
     # 注意：不暴露端口到宿主机，应用通过内部网络连接
     # 如需调试，可临时添加：ports: ["127.0.0.1:5433:5432"]
 
@@ -222,7 +225,7 @@ services:
   # ===========================================================================
   redis:
     image: redis:8-alpine
-    container_name: sub2api-redis
+    container_name: pragmaticplay-admin-redis
     restart: unless-stopped
     ulimits:
       nofile:
@@ -249,8 +252,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-    ports:
-      - 6379:6379
 # =============================================================================
 # Volumes
 # =============================================================================

@@ -8,15 +8,15 @@
 # Quick Start:
 #   1. Copy .env.example to .env and configure
 #   2. mkdir -p data postgres_data redis_data
-#   3. docker-compose -f docker-compose.local.yml up -d
-#   4. Check logs: docker-compose -f docker-compose.local.yml logs -f sub2api
-#   5. Access: http://localhost:8080
+#   3. docker compose -f docker-compose.local.yml up -d --build
+#   4. Check logs: docker compose -f docker-compose.local.yml logs -f sub2api
+#   5. Access: http://localhost:8090
 #
 # Migration to New Server:
-#   1. docker-compose -f docker-compose.local.yml down
+#   1. docker compose -f docker-compose.local.yml down
 #   2. tar czf sub2api-deploy.tar.gz deploy/
 #   3. Transfer to new server and extract
-#   4. docker-compose -f docker-compose.local.yml up -d
+#   4. docker compose -f docker-compose.local.yml up -d --build
 # =============================================================================
 
 services:
@@ -24,15 +24,20 @@ services:
   # Sub2API Application
   # ===========================================================================
   sub2api:
-    image: weishaw/sub2api:latest
-    container_name: sub2api
+    image: pragmaticplay-admin:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VITE_GAME_SERVICE_BASE_URL: ${VITE_GAME_SERVICE_BASE_URL:-http://127.0.0.1:3100}
+    container_name: pragmaticplay-admin
     restart: unless-stopped
     ulimits:
       nofile:
         soft: 100000
         hard: 100000
     ports:
-      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
+      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8090}:8080"
     volumes:
       # Local directory mapping for easy migration
       - ./data:/app/data
@@ -177,7 +182,7 @@ services:
   # ===========================================================================
   postgres:
     image: postgres:18-alpine
-    container_name: sub2api-postgres
+    container_name: pragmaticplay-admin-postgres
     restart: unless-stopped
     ulimits:
       nofile:
@@ -208,7 +213,7 @@ services:
   # ===========================================================================
   redis:
     image: redis:8-alpine
-    container_name: sub2api-redis
+    container_name: pragmaticplay-admin-redis
     restart: unless-stopped
     ulimits:
       nofile:

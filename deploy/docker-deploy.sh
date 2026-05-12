@@ -1,14 +1,13 @@
 #!/bin/bash
 # =============================================================================
-# Sub2API Docker Deployment Preparation Script
+# Pragmatic Play Admin Docker Deployment Preparation Script
 # =============================================================================
-# This script prepares deployment files for Sub2API:
-#   - Downloads docker-compose.local.yml and .env.example
+# This script prepares deployment files for the project-local admin service:
 #   - Generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
 #   - Creates necessary data directories
 #
 # After running this script, you can start services with:
-#   docker-compose up -d
+#   docker compose -f docker-compose.local.yml up -d --build
 # =============================================================================
 
 set -e
@@ -19,9 +18,6 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
-
-# GitHub raw content base URL
-GITHUB_RAW_URL="https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy"
 
 # Print colored message
 print_info() {
@@ -66,7 +62,7 @@ main() {
 
     # Check if deployment already exists
     if [ -f "docker-compose.yml" ] && [ -f ".env" ]; then
-        print_warning "Deployment files already exist in current directory."
+        print_warning "Deployment .env already exists in current directory."
         read -p "Overwrite existing files? (y/N): " -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -75,26 +71,11 @@ main() {
         fi
     fi
 
-    # Download docker-compose.local.yml and save as docker-compose.yml
-    print_info "Downloading docker-compose.yml..."
-    if command_exists curl; then
-        curl -sSL "${GITHUB_RAW_URL}/docker-compose.local.yml" -o docker-compose.yml
-    elif command_exists wget; then
-        wget -q "${GITHUB_RAW_URL}/docker-compose.local.yml" -O docker-compose.yml
-    else
-        print_error "Neither curl nor wget is installed. Please install one of them."
+    if [ ! -f "docker-compose.local.yml" ] || [ ! -f ".env.example" ]; then
+        print_error "docker-compose.local.yml and .env.example must exist in the current deploy directory."
+        print_error "Run this script from pragmaticplay_games/admin/deploy."
         exit 1
     fi
-    print_success "Downloaded docker-compose.yml"
-
-    # Download .env.example
-    print_info "Downloading .env.example..."
-    if command_exists curl; then
-        curl -sSL "${GITHUB_RAW_URL}/.env.example" -o .env.example
-    else
-        wget -q "${GITHUB_RAW_URL}/.env.example" -O .env.example
-    fi
-    print_success "Downloaded .env.example"
 
     # Generate .env file with auto-generated secrets
     print_info "Generating secure secrets..."
@@ -144,7 +125,7 @@ main() {
     print_warning "Please keep them secure and do not share publicly!"
     echo ""
     echo "Directory structure:"
-    echo "  docker-compose.yml        - Docker Compose configuration"
+    echo "  docker-compose.local.yml  - Docker Compose configuration"
     echo "  .env                      - Environment variables (generated secrets)"
     echo "  .env.example              - Example template (for reference)"
     echo "  data/                     - Application data (will be created on first run)"
@@ -154,13 +135,13 @@ main() {
     echo "Next steps:"
     echo "  1. (Optional) Edit .env to customize configuration"
     echo "  2. Start services:"
-    echo "     docker-compose up -d"
+    echo "     docker compose -f docker-compose.local.yml up -d --build"
     echo ""
     echo "  3. View logs:"
-    echo "     docker-compose logs -f sub2api"
+    echo "     docker compose -f docker-compose.local.yml logs -f sub2api"
     echo ""
     echo "  4. Access Web UI:"
-    echo "     http://localhost:8080"
+    echo "     http://localhost:8090"
     echo ""
     print_info "If admin password is not set in .env, it will be auto-generated."
     print_info "Check logs for the generated admin password on first startup."

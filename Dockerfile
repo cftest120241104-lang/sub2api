@@ -18,6 +18,9 @@ ARG GOSUMDB=sum.golang.google.cn
 # -----------------------------------------------------------------------------
 FROM ${NODE_IMAGE} AS frontend-builder
 
+ARG VITE_GAME_SERVICE_BASE_URL=http://127.0.0.1:3100
+ENV VITE_GAME_SERVICE_BASE_URL=${VITE_GAME_SERVICE_BASE_URL}
+
 WORKDIR /app/frontend
 
 # Install pnpm

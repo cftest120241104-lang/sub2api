@@ -29,22 +29,16 @@ This directory contains files for deploying Sub2API on Linux servers.
 
 ## Docker Deployment (Recommended)
 
-### Method 1: One-Click Deployment (Recommended)
+### Method 1: Local Preparation Script (Recommended)
 
-Use the automated preparation script for the easiest setup:
+Use the project-local preparation script from this repository. Do not use the upstream `Wei-Shaw/sub2api` raw script here; it downloads the upstream image-based compose file and will not include the game-service admin page.
 
 ```bash
-# Download and run the preparation script
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/docker-deploy.sh | bash
-
-# Or download first, then run
-curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/docker-deploy.sh -o docker-deploy.sh
 chmod +x docker-deploy.sh
 ./docker-deploy.sh
 ```
 
 **What the script does:**
-- Downloads `docker-compose.local.yml` and `.env.example`
 - Automatically generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
 - Creates `.env` file with generated secrets
 - Creates necessary data directories (data/, postgres_data/, redis_data/)
@@ -53,7 +47,7 @@ chmod +x docker-deploy.sh
 **After running the script:**
 ```bash
 # Start services
-docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml up -d --build
 
 # View logs
 docker compose -f docker-compose.local.yml logs -f sub2api
@@ -62,7 +56,7 @@ docker compose -f docker-compose.local.yml logs -f sub2api
 docker compose -f docker-compose.local.yml logs sub2api | grep "admin password"
 
 # Access Web UI
-# http://localhost:8080
+# http://localhost:8090
 ```
 
 ### Method 2: Manual Deployment
@@ -71,8 +65,8 @@ If you prefer manual control:
 
 ```bash
 # Clone repository
-git clone https://github.com/Wei-Shaw/sub2api.git
-cd sub2api/deploy
+git clone git@github-ai:cftest120241104-lang/pragmaticplay_games.git
+cd pragmaticplay_games/admin/deploy
 
 # Configure environment
 cp .env.example .env
@@ -88,13 +82,13 @@ echo "TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}" >> .env
 mkdir -p data postgres_data redis_data
 
 # Start all services using local directory version
-docker compose -f docker-compose.local.yml up -d
+docker compose -f docker-compose.local.yml up -d --build
 
 # View logs (check for auto-generated admin password)
 docker compose -f docker-compose.local.yml logs -f sub2api
 
 # Access Web UI
-# http://localhost:8080
+# http://localhost:8090
 ```
 
 ### Deployment Version Comparison
@@ -212,7 +206,8 @@ docker compose down -v
 | `POSTGRES_PASSWORD` | **Yes** | - | PostgreSQL password |
 | `JWT_SECRET` | **Recommended** | *(auto-generated)* | JWT secret (fixed for persistent sessions) |
 | `TOTP_ENCRYPTION_KEY` | **Recommended** | *(auto-generated)* | TOTP encryption key (fixed for persistent 2FA) |
-| `SERVER_PORT` | No | `8080` | Server port |
+| `SERVER_PORT` | No | `8090` | Host port for the admin web UI |
+| `VITE_GAME_SERVICE_BASE_URL` | No | `http://127.0.0.1:3100` | Game platform server URL embedded into the admin frontend at image build time |
 | `ADMIN_EMAIL` | No | `admin@sub2api.local` | Admin email |
 | `ADMIN_PASSWORD` | No | *(auto-generated)* | Admin password |
 | `TZ` | No | `Asia/Shanghai` | Timezone |
