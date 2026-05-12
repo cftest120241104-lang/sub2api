@@ -49,6 +49,99 @@ export interface GmScenarioState {
   scenarios: GameScenario[]
 }
 
+export interface GameRound {
+  roundId: string
+  channelCode: string
+  gameCode: string
+  playerId: string
+  currency: string
+  stakeCents: number
+  winCents: number
+  status: string
+  scenarioId: string
+  rawResult: Record<string, string>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LedgerTransaction {
+  txId: string
+  channelCode: string
+  playerId: string
+  currency: string
+  roundId: string
+  type: 'DEBIT' | 'CREDIT' | 'REFUND'
+  amountCents: number
+  balanceAfterCents: number
+  createdAt: string
+}
+
+export interface AuditEvent {
+  id?: number
+  channelCode?: string
+  gameCode?: string
+  playerId?: string
+  eventType: string
+  payload: Record<string, unknown>
+  createdAt: string
+}
+
+export interface PlayerSummary {
+  channelCode: string
+  gameCode?: string
+  playerId: string
+  currency: string
+  balanceCents: number
+  rounds: number
+  totalBetCents: number
+  totalWinCents: number
+  netCents: number
+  lastSeenAt?: string
+}
+
+export interface SecondStageModule {
+  key: string
+  title: string
+  status: 'planned' | 'contract-ready' | 'mvp-ready'
+  description: string
+  endpoints: string[]
+  acceptance: string[]
+}
+
+export interface SecondStageContract {
+  generatedAt: string
+  module: SecondStageModule
+  status: SecondStageModule['status']
+  data: Record<string, unknown>
+  nextActions: string[]
+}
+
+export interface GameOpsSummary {
+  generatedAt: string
+  totals: {
+    games: number
+    sessions: number
+    activeSessions: number
+    players: number
+    rounds: number
+    totalBetCents: number
+    totalWinCents: number
+    netCents: number
+    transactions: number
+    auditEvents: number
+  }
+  games: Array<{
+    gameCode: string
+    scenarios: number
+  }>
+  recentSessions: Array<GameSession & { id?: string; createdAt?: string }>
+  recentRounds: GameRound[]
+  recentTransactions: LedgerTransaction[]
+  recentAuditEvents: AuditEvent[]
+  topPlayers: PlayerSummary[]
+  secondStage: SecondStageModule[]
+}
+
 export interface CreateGameSessionParams {
   channelCode: string
   gameCode: string
@@ -154,6 +247,34 @@ export async function collectGame(scope: ScenarioScope): Promise<ProtocolPayload
   })
 }
 
+export async function getOpsSummary(): Promise<GameOpsSummary> {
+  const { data } = await gameServiceClient.get<GameOpsSummary>('/admin/ops/summary')
+  return data
+}
+
+export async function getPlayers(): Promise<PlayerSummary[]> {
+  const { data } = await gameServiceClient.get<PlayerSummary[]>('/admin/ops/players')
+  return data
+}
+
+export async function getSecondStageModules(): Promise<SecondStageModule[]> {
+  const { data } = await gameServiceClient.get<SecondStageModule[]>('/admin/ops/second-stage')
+  return data
+}
+
+export async function getSecondStageContract(endpoint: string): Promise<SecondStageContract> {
+  const normalized = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  const { data } = await gameServiceClient.get<SecondStageContract>(normalized)
+  return data
+}
+
+export async function exportOpsCsv(): Promise<Blob> {
+  const { data } = await gameServiceClient.get<Blob>('/admin/ops/export.csv', {
+    responseType: 'blob',
+  })
+  return data
+}
+
 export const gameServiceAPI = {
   baseUrl: GAME_SERVICE_BASE_URL,
   getHealth,
@@ -164,6 +285,11 @@ export const gameServiceAPI = {
   initGame,
   spinGame,
   collectGame,
+  getOpsSummary,
+  getPlayers,
+  getSecondStageModules,
+  getSecondStageContract,
+  exportOpsCsv,
 }
 
 export default gameServiceAPI
