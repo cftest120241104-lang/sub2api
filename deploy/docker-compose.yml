@@ -22,7 +22,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_GAME_SERVICE_BASE_URL: ${VITE_GAME_SERVICE_BASE_URL:-http://127.0.0.1:3100}
-    container_name: pragmaticplay-admin
+    container_name: ${ADMIN_CONTAINER_NAME:-pragmaticplay-admin}
     restart: unless-stopped
     ulimits:
       nofile:
@@ -188,7 +188,7 @@ services:
   # ===========================================================================
   postgres:
     image: postgres:18-alpine
-    container_name: pragmaticplay-admin-postgres
+    container_name: ${ADMIN_POSTGRES_CONTAINER_NAME:-pragmaticplay-admin-postgres}
     restart: unless-stopped
     ulimits:
       nofile:
@@ -225,7 +225,7 @@ services:
   # ===========================================================================
   redis:
     image: redis:8-alpine
-    container_name: pragmaticplay-admin-redis
+    container_name: ${ADMIN_REDIS_CONTAINER_NAME:-pragmaticplay-admin-redis}
     restart: unless-stopped
     ulimits:
       nofile:

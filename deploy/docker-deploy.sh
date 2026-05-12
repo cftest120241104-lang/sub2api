@@ -3,7 +3,7 @@
 # Pragmatic Play Admin Docker Deployment Preparation Script
 # =============================================================================
 # This script prepares deployment files for the project-local admin service:
-#   - Generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
+#   - Generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD, ADMIN_PASSWORD)
 #   - Creates necessary data directories
 #
 # After running this script, you can start services with:
@@ -39,6 +39,11 @@ print_error() {
 # Generate random secret
 generate_secret() {
     openssl rand -hex 32
+}
+
+generate_admin_password() {
+    printf "Adm1n!"
+    openssl rand -hex 16
 }
 
 # Check if command exists
@@ -85,6 +90,7 @@ main() {
     JWT_SECRET=$(generate_secret)
     TOTP_ENCRYPTION_KEY=$(generate_secret)
     POSTGRES_PASSWORD=$(generate_secret)
+    ADMIN_PASSWORD=$(generate_admin_password)
 
     # Create .env from .env.example
     cp .env.example .env
@@ -95,11 +101,13 @@ main() {
         sed -i "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
         sed -i "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
         sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
+        sed -i "s/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${ADMIN_PASSWORD}/" .env
     else
         # BSD sed (macOS)
         sed -i '' "s/^JWT_SECRET=.*/JWT_SECRET=${JWT_SECRET}/" .env
         sed -i '' "s/^TOTP_ENCRYPTION_KEY=.*/TOTP_ENCRYPTION_KEY=${TOTP_ENCRYPTION_KEY}/" .env
         sed -i '' "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${POSTGRES_PASSWORD}/" .env
+        sed -i '' "s/^ADMIN_PASSWORD=.*/ADMIN_PASSWORD=${ADMIN_PASSWORD}/" .env
     fi
 
     # Create data directories
@@ -118,6 +126,7 @@ main() {
     echo ""
     echo "Generated secure credentials:"
     echo "  POSTGRES_PASSWORD:     ${POSTGRES_PASSWORD}"
+    echo "  ADMIN_PASSWORD:        ${ADMIN_PASSWORD}"
     echo "  JWT_SECRET:            ${JWT_SECRET}"
     echo "  TOTP_ENCRYPTION_KEY:   ${TOTP_ENCRYPTION_KEY}"
     echo ""
@@ -134,17 +143,20 @@ main() {
     echo ""
     echo "Next steps:"
     echo "  1. (Optional) Edit .env to customize configuration"
-    echo "  2. Start services:"
+    echo "  2. Verify env and compose:"
+    echo "     ./verify-production-env.ps1 -EnvFile .env"
+    echo "     ./verify-compose.ps1 -ComposeFile docker-compose.local.yml -EnvFile .env"
+    echo ""
+    echo "  3. Start services:"
     echo "     docker compose -f docker-compose.local.yml up -d --build"
     echo ""
-    echo "  3. View logs:"
+    echo "  4. View logs:"
     echo "     docker compose -f docker-compose.local.yml logs -f sub2api"
     echo ""
-    echo "  4. Access Web UI:"
+    echo "  5. Access Web UI:"
     echo "     http://localhost:8090"
     echo ""
-    print_info "If admin password is not set in .env, it will be auto-generated."
-    print_info "Check logs for the generated admin password on first startup."
+    print_info "Use ADMIN_EMAIL and ADMIN_PASSWORD from .env to sign in."
     echo ""
 }
 

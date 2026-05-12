@@ -30,7 +30,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_GAME_SERVICE_BASE_URL: ${VITE_GAME_SERVICE_BASE_URL:-http://127.0.0.1:3100}
-    container_name: pragmaticplay-admin
+    container_name: ${ADMIN_CONTAINER_NAME:-pragmaticplay-admin}
     restart: unless-stopped
     ulimits:
       nofile:
@@ -40,7 +40,7 @@ services:
       - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8090}:8080"
     volumes:
       # Local directory mapping for easy migration
-      - ./data:/app/data
+      - ${ADMIN_DATA_DIR:-./data}:/app/data
       # Optional: Mount custom config.yaml (uncomment and create the file first)
       # Copy config.example.yaml to config.yaml, modify it, then uncomment:
       # - ./config.yaml:/app/data/config.yaml
@@ -182,7 +182,7 @@ services:
   # ===========================================================================
   postgres:
     image: postgres:18-alpine
-    container_name: pragmaticplay-admin-postgres
+    container_name: ${ADMIN_POSTGRES_CONTAINER_NAME:-pragmaticplay-admin-postgres}
     restart: unless-stopped
     ulimits:
       nofile:
@@ -190,7 +190,7 @@ services:
         hard: 100000
     volumes:
       # Local directory mapping for easy migration
-      - ./postgres_data:/var/lib/postgresql/data
+      - ${ADMIN_POSTGRES_DATA_DIR:-./postgres_data}:/var/lib/postgresql/data
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-sub2api}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -213,7 +213,7 @@ services:
   # ===========================================================================
   redis:
     image: redis:8-alpine
-    container_name: pragmaticplay-admin-redis
+    container_name: ${ADMIN_REDIS_CONTAINER_NAME:-pragmaticplay-admin-redis}
     restart: unless-stopped
     ulimits:
       nofile:
@@ -221,7 +221,7 @@ services:
         hard: 100000
     volumes:
       # Local directory mapping for easy migration
-      - ./redis_data:/data
+      - ${ADMIN_REDIS_DATA_DIR:-./redis_data}:/data
     command: >
         sh -c '
           redis-server

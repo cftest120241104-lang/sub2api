@@ -6,6 +6,9 @@
 data/
 postgres_data/
 redis_data/
+data_verify/
+postgres_data_verify/
+redis_data_verify/
 
 # Environment configuration (contains sensitive information)
 .env
