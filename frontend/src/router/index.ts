@@ -381,6 +381,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/game-service',
+    name: 'AdminGameService',
+    component: () => import('@/views/admin/GameServiceView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Game Service',
+      titleKey: 'admin.gameService.title',
+      descriptionKey: 'admin.gameService.description'
+    }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),
