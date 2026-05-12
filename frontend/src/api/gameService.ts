@@ -116,6 +116,145 @@ export interface SecondStageContract {
   nextActions: string[]
 }
 
+export interface OpsRiskRule {
+  id: string
+  name: string
+  scope: string
+  metric: string
+  thresholdCents?: number
+  thresholdCount?: number
+  action: string
+  enabled: boolean
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsRiskEvent {
+  id: string
+  ruleId: string
+  severity: string
+  channelCode?: string
+  gameCode?: string
+  playerId?: string
+  roundId?: string
+  message: string
+  status: string
+  payload: Record<string, unknown>
+  createdAt: string
+  resolvedAt?: string
+}
+
+export interface OpsGameBranch {
+  id: string
+  gameCode: string
+  version: string
+  status: string
+  rolloutPercent: number
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsReleasePlan {
+  id: string
+  channelCode: string
+  gameCode: string
+  targetVersion: string
+  rolloutPercent: number
+  rollbackVersion?: string
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsCampaign {
+  id: string
+  name: string
+  type: string
+  status: string
+  budgetCents: number
+  startsAt?: string
+  endsAt?: string
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsReward {
+  id: string
+  campaignId: string
+  channelCode: string
+  gameCode: string
+  playerId: string
+  currency: string
+  amountCents: number
+  ledgerTxId?: string
+  status: string
+  payload: Record<string, unknown>
+  createdAt: string
+}
+
+export interface OpsTenant {
+  id: string
+  name: string
+  status: string
+  channelCodes: string[]
+  permissions: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsChannelSettlement {
+  id: string
+  tenantId: string
+  channelCode: string
+  period: string
+  totalBetCents: number
+  totalWinCents: number
+  netCents: number
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsAlertRule {
+  id: string
+  name: string
+  source: string
+  severity: string
+  condition: string
+  enabled: boolean
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsAlertEvent {
+  id: string
+  ruleId: string
+  source: string
+  severity: string
+  message: string
+  status: string
+  payload: Record<string, unknown>
+  createdAt: string
+  resolvedAt?: string
+}
+
+export interface SecondStageSnapshot {
+  riskRules: OpsRiskRule[]
+  riskEvents: OpsRiskEvent[]
+  gameBranches: OpsGameBranch[]
+  releasePlans: OpsReleasePlan[]
+  campaigns: OpsCampaign[]
+  rewards: OpsReward[]
+  tenants: OpsTenant[]
+  settlements: OpsChannelSettlement[]
+  alertRules: OpsAlertRule[]
+  alertEvents: OpsAlertEvent[]
+}
+
 export interface GameOpsSummary {
   generatedAt: string
   totals: {
@@ -263,8 +402,117 @@ export async function getSecondStageModules(): Promise<SecondStageModule[]> {
 }
 
 export async function getSecondStageContract(endpoint: string): Promise<SecondStageContract> {
-  const normalized = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  const normalized = endpoint.startsWith('/admin/ops/second-stage')
+    ? endpoint
+    : endpoint.startsWith('/admin/ops/')
+      ? endpoint.replace('/admin/ops/', '/admin/ops/second-stage/')
+      : endpoint.startsWith('/')
+        ? endpoint
+        : `/admin/ops/second-stage/${endpoint}`
   const { data } = await gameServiceClient.get<SecondStageContract>(normalized)
+  return data
+}
+
+export async function getSecondStageSnapshot(): Promise<SecondStageSnapshot> {
+  const [
+    riskRules,
+    riskEvents,
+    gameBranches,
+    releasePlans,
+    campaigns,
+    rewards,
+    tenants,
+    settlements,
+    alertRules,
+    alertEvents,
+  ] = await Promise.all([
+    gameServiceClient.get<OpsRiskRule[]>('/admin/ops/risk-rules'),
+    gameServiceClient.get<OpsRiskEvent[]>('/admin/ops/risk-events'),
+    gameServiceClient.get<OpsGameBranch[]>('/admin/ops/game-branches'),
+    gameServiceClient.get<OpsReleasePlan[]>('/admin/ops/release-plans'),
+    gameServiceClient.get<OpsCampaign[]>('/admin/ops/campaigns'),
+    gameServiceClient.get<OpsReward[]>('/admin/ops/rewards'),
+    gameServiceClient.get<OpsTenant[]>('/admin/ops/tenants'),
+    gameServiceClient.get<OpsChannelSettlement[]>('/admin/ops/channel-settlement'),
+    gameServiceClient.get<OpsAlertRule[]>('/admin/ops/alert-rules'),
+    gameServiceClient.get<OpsAlertEvent[]>('/admin/ops/alert-events'),
+  ])
+  return {
+    riskRules: riskRules.data,
+    riskEvents: riskEvents.data,
+    gameBranches: gameBranches.data,
+    releasePlans: releasePlans.data,
+    campaigns: campaigns.data,
+    rewards: rewards.data,
+    tenants: tenants.data,
+    settlements: settlements.data,
+    alertRules: alertRules.data,
+    alertEvents: alertEvents.data,
+  }
+}
+
+export async function createRiskRule(payload: Partial<OpsRiskRule>): Promise<OpsRiskRule> {
+  const { data } = await gameServiceClient.post<OpsRiskRule>('/admin/ops/risk-rules', payload)
+  return data
+}
+
+export async function createRiskEvent(payload: Partial<OpsRiskEvent>): Promise<OpsRiskEvent> {
+  const { data } = await gameServiceClient.post<OpsRiskEvent>('/admin/ops/risk-events', payload)
+  return data
+}
+
+export async function resolveRiskEvent(id: string, status = 'resolved'): Promise<OpsRiskEvent> {
+  const { data } = await gameServiceClient.patch<OpsRiskEvent>(`/admin/ops/risk-events/${id}`, { status })
+  return data
+}
+
+export async function createGameBranch(payload: Partial<OpsGameBranch>): Promise<OpsGameBranch> {
+  const { data } = await gameServiceClient.post<OpsGameBranch>('/admin/ops/game-branches', payload)
+  return data
+}
+
+export async function createReleasePlan(payload: Partial<OpsReleasePlan>): Promise<OpsReleasePlan> {
+  const { data } = await gameServiceClient.post<OpsReleasePlan>('/admin/ops/release-plans', payload)
+  return data
+}
+
+export async function updateReleasePlan(id: string, status = 'active'): Promise<OpsReleasePlan> {
+  const { data } = await gameServiceClient.patch<OpsReleasePlan>(`/admin/ops/release-plans/${id}`, { status })
+  return data
+}
+
+export async function createCampaign(payload: Partial<OpsCampaign>): Promise<OpsCampaign> {
+  const { data } = await gameServiceClient.post<OpsCampaign>('/admin/ops/campaigns', payload)
+  return data
+}
+
+export async function grantReward(payload: Partial<OpsReward>): Promise<OpsReward> {
+  const { data } = await gameServiceClient.post<OpsReward>('/admin/ops/rewards', payload)
+  return data
+}
+
+export async function createTenant(payload: Partial<OpsTenant>): Promise<OpsTenant> {
+  const { data } = await gameServiceClient.post<OpsTenant>('/admin/ops/tenants', payload)
+  return data
+}
+
+export async function generateSettlement(payload: Partial<OpsChannelSettlement>): Promise<OpsChannelSettlement> {
+  const { data } = await gameServiceClient.post<OpsChannelSettlement>('/admin/ops/channel-settlement', payload)
+  return data
+}
+
+export async function createAlertRule(payload: Partial<OpsAlertRule>): Promise<OpsAlertRule> {
+  const { data } = await gameServiceClient.post<OpsAlertRule>('/admin/ops/alert-rules', payload)
+  return data
+}
+
+export async function createAlertEvent(payload: Partial<OpsAlertEvent>): Promise<OpsAlertEvent> {
+  const { data } = await gameServiceClient.post<OpsAlertEvent>('/admin/ops/alert-events', payload)
+  return data
+}
+
+export async function resolveAlertEvent(id: string, status = 'resolved'): Promise<OpsAlertEvent> {
+  const { data } = await gameServiceClient.patch<OpsAlertEvent>(`/admin/ops/alert-events/${id}`, { status })
   return data
 }
 
@@ -289,6 +537,20 @@ export const gameServiceAPI = {
   getPlayers,
   getSecondStageModules,
   getSecondStageContract,
+  getSecondStageSnapshot,
+  createRiskRule,
+  createRiskEvent,
+  resolveRiskEvent,
+  createGameBranch,
+  createReleasePlan,
+  updateReleasePlan,
+  createCampaign,
+  grantReward,
+  createTenant,
+  generateSettlement,
+  createAlertRule,
+  createAlertEvent,
+  resolveAlertEvent,
   exportOpsCsv,
 }
 

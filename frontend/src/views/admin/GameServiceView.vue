@@ -292,40 +292,144 @@
           <div>
             <h2 class="text-base font-semibold text-gray-900 dark:text-white">第二阶段入口</h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              这些模块已在后台展示验收契约，后续按接口契约逐项实现真实配置与处置流程。
+              风控、灰度、活动、租户结算和告警已经接入真实读写接口，所有操作会写入审计日志。
             </p>
           </div>
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingSecondStageSnapshot" @click="loadSecondStageSnapshot">
+            <Icon name="refresh" size="sm" />
+            {{ loadingSecondStageSnapshot ? t('common.loading') : '刷新模块' }}
+          </button>
         </div>
+        <div class="mt-5 grid gap-4 xl:grid-cols-5">
+          <MetricCard label="风控规则" :value="secondStageSnapshot?.riskRules.length ?? 0" hint="可配置限额和处置动作" />
+          <MetricCard label="游戏分支" :value="secondStageSnapshot?.gameBranches.length ?? 0" hint="多版本和灰度比例" />
+          <MetricCard label="活动奖励" :value="secondStageSnapshot?.rewards.length ?? 0" hint="已发放钱包流水" />
+          <MetricCard label="租户结算" :value="secondStageSnapshot?.settlements.length ?? 0" hint="渠道周期报表" />
+          <MetricCard label="告警事件" :value="secondStageSnapshot?.alertEvents.length ?? 0" hint="可处置状态" />
+        </div>
+
         <div class="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          <div
-            v-for="module in opsSummary?.secondStage"
-            :key="module.key"
-            class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60"
-          >
+          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
             <div class="flex items-start justify-between gap-3">
               <div>
-                <h3 class="font-medium text-gray-900 dark:text-white">{{ module.title }}</h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ module.description }}</p>
+                <h3 class="font-medium text-gray-900 dark:text-white">风控策略</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">限额规则、异常事件和人工处置。</p>
               </div>
-              <StatusBadge :status="module.status === 'planned' ? 'warning' : 'success'" :label="module.status" />
+              <StatusBadge status="success" label="mvp-ready" />
             </div>
-            <div class="mt-4">
-              <div class="text-xs font-medium text-gray-500 dark:text-gray-400">接口契约</div>
-              <div class="mt-2 space-y-1 font-mono text-xs text-gray-600 dark:text-gray-300">
-                <button
-                  v-for="endpoint in module.endpoints"
-                  :key="endpoint"
-                  type="button"
-                  class="block rounded px-1 py-0.5 text-left transition hover:bg-white hover:text-primary-600 dark:hover:bg-dark-800"
-                  @click="loadSecondStageContract(endpoint)"
-                >
-                  {{ endpoint }}
-                </button>
+            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+              <div v-for="rule in secondStageSnapshot?.riskRules.slice(0, 3)" :key="rule.id" class="flex items-center justify-between gap-3">
+                <span class="truncate">{{ rule.name }}</span>
+                <span class="font-mono">{{ rule.thresholdCents ? formatMoney(rule.thresholdCents) : rule.thresholdCount || '-' }}</span>
               </div>
+              <p v-if="!secondStageSnapshot?.riskRules.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
             </div>
-            <ul class="mt-4 space-y-1 text-xs text-gray-500 dark:text-gray-400">
-              <li v-for="item in module.acceptance" :key="item">- {{ item }}</li>
-            </ul>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoRiskRule">创建规则</button>
+              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="createDemoRiskEvent">触发事件</button>
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading || !firstOpenRiskEvent" @click="resolveFirstRiskEvent">处置事件</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="font-medium text-gray-900 dark:text-white">分支与灰度</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">管理游戏版本、发布计划和回滚目标。</p>
+              </div>
+              <StatusBadge status="success" label="mvp-ready" />
+            </div>
+            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+              <div v-for="plan in secondStageSnapshot?.releasePlans.slice(0, 3)" :key="plan.id" class="flex items-center justify-between gap-3">
+                <span class="truncate">{{ plan.channelCode }} / {{ plan.targetVersion }}</span>
+                <span>{{ plan.rolloutPercent }}% / {{ plan.status }}</span>
+              </div>
+              <p v-if="!secondStageSnapshot?.releasePlans.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoBranch">创建分支</button>
+              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="createDemoReleasePlan">新建灰度</button>
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading || !firstDraftReleasePlan" @click="activateFirstReleasePlan">激活计划</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="font-medium text-gray-900 dark:text-white">活动与奖励</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">运营活动配置和奖励发放进入钱包流水。</p>
+              </div>
+              <StatusBadge status="success" label="mvp-ready" />
+            </div>
+            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+              <div v-for="reward in secondStageSnapshot?.rewards.slice(0, 3)" :key="reward.id" class="flex items-center justify-between gap-3">
+                <span class="truncate">{{ reward.playerId }}</span>
+                <span class="font-mono">{{ formatMoney(reward.amountCents) }}</span>
+              </div>
+              <p v-if="!secondStageSnapshot?.rewards.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoCampaign">创建活动</button>
+              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="grantDemoReward">发放奖励</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="font-medium text-gray-900 dark:text-white">代理与结算</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">租户、渠道权限和周期结算报表。</p>
+              </div>
+              <StatusBadge status="success" label="mvp-ready" />
+            </div>
+            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+              <div v-for="settlement in secondStageSnapshot?.settlements.slice(0, 3)" :key="settlement.id" class="flex items-center justify-between gap-3">
+                <span class="truncate">{{ settlement.tenantId }} / {{ settlement.period }}</span>
+                <span class="font-mono">{{ formatMoney(settlement.netCents) }}</span>
+              </div>
+              <p v-if="!secondStageSnapshot?.settlements.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoTenant">创建租户</button>
+              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="generateDemoSettlement">生成结算</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="font-medium text-gray-900 dark:text-white">告警与值班</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">健康状态、业务指标和人工处置记录。</p>
+              </div>
+              <StatusBadge status="success" label="mvp-ready" />
+            </div>
+            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+              <div v-for="event in secondStageSnapshot?.alertEvents.slice(0, 3)" :key="event.id" class="flex items-center justify-between gap-3">
+                <span class="truncate">{{ event.message }}</span>
+                <span>{{ event.status }}</span>
+              </div>
+              <p v-if="!secondStageSnapshot?.alertEvents.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoAlertRule">创建规则</button>
+              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="createDemoAlertEvent">触发告警</button>
+              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading || !firstOpenAlertEvent" @click="resolveFirstAlertEvent">处置告警</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <div class="text-xs font-medium text-gray-500 dark:text-gray-400">接口数据</div>
+          <div class="mt-2 flex flex-wrap gap-2 font-mono text-xs">
+            <button
+              v-for="module in opsSummary?.secondStage"
+              :key="module.key"
+              type="button"
+              class="rounded border border-gray-200 px-2 py-1 text-left transition hover:border-primary-400 hover:text-primary-600 dark:border-dark-700"
+              @click="loadSecondStageContract(module.key)"
+            >
+              /admin/ops/second-stage/{{ module.key }}
+            </button>
           </div>
         </div>
         <div v-if="secondStageContract" class="mt-5 rounded-xl border border-gray-100 bg-gray-950 p-4 dark:border-dark-700">
@@ -359,6 +463,7 @@ import gameServiceAPI, {
   type GmScenarioState,
   type ProtocolPayload,
   type SecondStageContract,
+  type SecondStageSnapshot,
 } from '@/api/gameService'
 
 const { t } = useI18n()
@@ -371,6 +476,8 @@ const creatingSession = ref(false)
 const loadingScenario = ref(false)
 const settingScenario = ref<string | null>(null)
 const protocolLoading = ref(false)
+const loadingSecondStageSnapshot = ref(false)
+const secondStageActionLoading = ref(false)
 
 const health = ref<GameHealth | null>(null)
 const ready = ref<GameReady | null>(null)
@@ -380,6 +487,7 @@ const scenarioState = ref<GmScenarioState | null>(null)
 const lastProtocol = ref<ProtocolPayload | null>(null)
 const secondStageContract = ref<SecondStageContract | null>(null)
 const loadingSecondStage = ref(false)
+const secondStageSnapshot = ref<SecondStageSnapshot | null>(null)
 
 const sessionForm = reactive({
   channelCode: 'demo',
@@ -401,6 +509,18 @@ const readyChecks = computed(() => {
 
 const protocolOutput = computed(() => {
   return lastProtocol.value ? JSON.stringify(lastProtocol.value, null, 2) : '暂无协议响应'
+})
+
+const firstOpenRiskEvent = computed(() => {
+  return secondStageSnapshot.value?.riskEvents.find(event => event.status !== 'resolved') || null
+})
+
+const firstDraftReleasePlan = computed(() => {
+  return secondStageSnapshot.value?.releasePlans.find(plan => plan.status !== 'active') || null
+})
+
+const firstOpenAlertEvent = computed(() => {
+  return secondStageSnapshot.value?.alertEvents.find(event => event.status !== 'resolved') || null
 })
 
 const MetricCard = defineComponent({
@@ -508,8 +628,19 @@ async function loadOps() {
   }
 }
 
+async function loadSecondStageSnapshot() {
+  loadingSecondStageSnapshot.value = true
+  try {
+    secondStageSnapshot.value = await gameServiceAPI.getSecondStageSnapshot()
+  } catch (error) {
+    handleError(error, '第二阶段模块加载失败')
+  } finally {
+    loadingSecondStageSnapshot.value = false
+  }
+}
+
 async function reloadAll() {
-  await Promise.all([loadStatus(), loadOps()])
+  await Promise.all([loadStatus(), loadOps(), loadSecondStageSnapshot()])
 }
 
 async function startSession() {
@@ -649,6 +780,144 @@ async function loadSecondStageContract(endpoint: string) {
   } finally {
     loadingSecondStage.value = false
   }
+}
+
+async function runSecondStageAction(message: string, action: () => Promise<unknown>) {
+  secondStageActionLoading.value = true
+  try {
+    await action()
+    await Promise.all([loadOps(), loadSecondStageSnapshot()])
+    appStore.showSuccess(message)
+  } catch (error) {
+    handleError(error, '第二阶段操作失败')
+  } finally {
+    secondStageActionLoading.value = false
+  }
+}
+
+async function createDemoRiskRule() {
+  await runSecondStageAction('风控规则已保存', () => gameServiceAPI.createRiskRule({
+    id: `manual-limit-${Date.now()}`,
+    name: '人工单局限额',
+    scope: 'channel/game/player',
+    metric: 'stakeCents',
+    thresholdCents: 300000,
+    action: 'review',
+    enabled: true,
+  }))
+}
+
+async function createDemoRiskEvent() {
+  await runSecondStageAction('风控事件已创建', () => gameServiceAPI.createRiskEvent({
+    ruleId: secondStageSnapshot.value?.riskRules[0]?.id || 'max-single-bet',
+    severity: 'warning',
+    channelCode: session.value?.channelCode || sessionForm.channelCode,
+    gameCode: session.value?.gameCode || sessionForm.gameCode,
+    playerId: session.value?.playerId || sessionForm.playerId,
+    message: '后台人工触发风控复核',
+    payload: { source: 'admin-demo' },
+  }))
+}
+
+async function resolveFirstRiskEvent() {
+  const event = firstOpenRiskEvent.value
+  if (!event) return
+  await runSecondStageAction('风控事件已处置', () => gameServiceAPI.resolveRiskEvent(event.id))
+}
+
+async function createDemoBranch() {
+  await runSecondStageAction('游戏分支已保存', () => gameServiceAPI.createGameBranch({
+    gameCode: sessionForm.gameCode,
+    version: `mvp-${Date.now()}`,
+    status: 'enabled',
+    rolloutPercent: 25,
+    config: { source: 'client/vs10jokerhot' },
+  }))
+}
+
+async function createDemoReleasePlan() {
+  await runSecondStageAction('灰度计划已创建', () => gameServiceAPI.createReleasePlan({
+    channelCode: sessionForm.channelCode,
+    gameCode: sessionForm.gameCode,
+    targetVersion: secondStageSnapshot.value?.gameBranches[0]?.version || 'mvp',
+    rolloutPercent: 25,
+    rollbackVersion: 'mvp',
+    status: 'draft',
+  }))
+}
+
+async function activateFirstReleasePlan() {
+  const plan = firstDraftReleasePlan.value
+  if (!plan) return
+  await runSecondStageAction('灰度计划已激活', () => gameServiceAPI.updateReleasePlan(plan.id, 'active'))
+}
+
+async function createDemoCampaign() {
+  await runSecondStageAction('活动已保存', () => gameServiceAPI.createCampaign({
+    id: `manual-reward-${Date.now()}`,
+    name: '人工奖励活动',
+    type: 'manual-reward',
+    status: 'active',
+    budgetCents: 500000,
+    config: { rewardCents: 1000 },
+  }))
+}
+
+async function grantDemoReward() {
+  await runSecondStageAction('奖励已发放', () => gameServiceAPI.grantReward({
+    campaignId: secondStageSnapshot.value?.campaigns[0]?.id || 'daily-spin-reward',
+    channelCode: session.value?.channelCode || sessionForm.channelCode,
+    gameCode: session.value?.gameCode || sessionForm.gameCode,
+    playerId: session.value?.playerId || sessionForm.playerId,
+    currency: session.value?.currency || sessionForm.currency,
+    amountCents: 1000,
+    payload: { source: 'admin-demo' },
+  }))
+}
+
+async function createDemoTenant() {
+  await runSecondStageAction('租户已保存', () => gameServiceAPI.createTenant({
+    id: `operator-${Date.now()}`,
+    name: 'Demo 新代理',
+    status: 'active',
+    channelCodes: [sessionForm.channelCode],
+    permissions: ['players:read', 'rounds:read', 'reports:export'],
+  }))
+}
+
+async function generateDemoSettlement() {
+  await runSecondStageAction('结算报表已生成', () => gameServiceAPI.generateSettlement({
+    tenantId: secondStageSnapshot.value?.tenants[0]?.id || 'operator-demo',
+    channelCode: sessionForm.channelCode,
+    period: new Date().toISOString().slice(0, 10),
+  }))
+}
+
+async function createDemoAlertRule() {
+  await runSecondStageAction('告警规则已保存', () => gameServiceAPI.createAlertRule({
+    id: `manual-alert-${Date.now()}`,
+    name: '人工值班告警',
+    source: '/admin/ops/summary',
+    severity: 'warning',
+    condition: 'manual=true',
+    enabled: true,
+  }))
+}
+
+async function createDemoAlertEvent() {
+  await runSecondStageAction('告警事件已创建', () => gameServiceAPI.createAlertEvent({
+    ruleId: secondStageSnapshot.value?.alertRules[0]?.id || 'negative-platform-net',
+    source: '/admin/ops/summary',
+    severity: 'warning',
+    message: '后台人工触发值班告警',
+    payload: { source: 'admin-demo' },
+  }))
+}
+
+async function resolveFirstAlertEvent() {
+  const event = firstOpenAlertEvent.value
+  if (!event) return
+  await runSecondStageAction('告警事件已处置', () => gameServiceAPI.resolveAlertEvent(event.id))
 }
 
 onMounted(() => {
