@@ -24,7 +24,7 @@
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard title="游戏数" :value="snapshot.games.length" icon="grid" hint="已接入目录" />
           <MetricCard title="场景数" :value="snapshot.scenarios.length" icon="beaker" tone="warning" hint="全部游戏场景" />
-          <MetricCard title="可用场景" :value="enabledScenarioCount" icon="checkCircle" tone="success" hint="enabled=true" />
+          <MetricCard title="棋盘模板" :value="gameBoardConfigs.length" icon="database" tone="success" hint="当前游戏可用" />
           <MetricCard title="收分场景" :value="collectScenarioCount" icon="play" tone="danger" hint="nextStep=collect" />
         </section>
 
@@ -44,6 +44,23 @@
                   {{ scenario.label }} / {{ scenario.id }}
                 </option>
               </select>
+
+              <label class="input-label mt-4">棋盘模板</label>
+              <select v-model="selectedBoardKey" class="input" :disabled="gameBoardConfigs.length === 0">
+                <option value="">选择模板应用到盘面</option>
+                <option v-for="board in gameBoardConfigs" :key="board.boardId" :value="board.boardId">
+                  {{ board.label }} / {{ board.boardId }}
+                </option>
+              </select>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm mt-3 w-full"
+                :disabled="!selectedBoard"
+                @click="applySelectedBoard"
+              >
+                <Icon name="grid" size="sm" />
+                应用棋盘模板
+              </button>
             </div>
 
             <div class="card p-5">
@@ -63,6 +80,25 @@
                   </div>
                   <div class="mt-1 font-mono text-xs text-gray-500">{{ scenario.id }}</div>
                 </button>
+              </div>
+            </div>
+
+            <div v-if="selectedBoard" class="card p-5">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="text-sm font-semibold text-gray-900 dark:text-white">模板预览</h2>
+                  <p class="mt-1 truncate font-mono text-xs text-gray-500">{{ selectedBoard.boardId }}</p>
+                </div>
+                <StatusBadge :status="selectedBoard.enabled ? 'success' : 'inactive'" :label="selectedBoard.enabled ? '启用' : '停用'" />
+              </div>
+              <div class="mt-4 grid grid-cols-5 gap-1">
+                <div
+                  v-for="(symbol, index) in selectedBoard.screen.symbols"
+                  :key="index"
+                  class="flex aspect-square items-center justify-center rounded-md border border-gray-200 bg-gray-50 font-mono text-xs font-semibold text-gray-700 dark:border-dark-600 dark:bg-dark-900 dark:text-gray-200"
+                >
+                  {{ symbol }}
+                </div>
               </div>
             </div>
           </aside>
@@ -124,7 +160,10 @@
 
             <div class="mt-6 grid gap-4 xl:grid-cols-2">
               <div>
-                <label class="input-label">盘面 JSON</label>
+                <div class="mb-1.5 flex items-center justify-between gap-3">
+                  <label class="text-sm font-medium text-gray-700 dark:text-gray-300">盘面 JSON</label>
+                  <span v-if="selectedBoardKey" class="font-mono text-xs text-gray-500">{{ selectedBoardKey }}</span>
+                </div>
                 <textarea v-model="screenText" class="input min-h-64 font-mono text-xs"></textarea>
               </div>
               <div>
@@ -154,6 +193,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import {
   loadGameAdminSnapshot,
   saveScenarioConfig,
+  type BoardConfig,
   type GameAdminSnapshot,
   type ScenarioConfig,
 } from '@/api/gameAdmin'
@@ -170,6 +210,7 @@ const saving = ref(false)
 const snapshot = ref<GameAdminSnapshot | null>(null)
 const selectedGameCode = ref('')
 const selectedScenarioId = ref('')
+const selectedBoardKey = ref('')
 const editableScenario = ref<ScenarioConfig | null>(null)
 const screenText = ref('')
 const lineWinsText = ref('')
@@ -180,12 +221,20 @@ const gameScenarios = computed(() => {
     scenario.gameCode === selectedGameCode.value
   )
 })
-const enabledScenarioCount = computed(() => snapshot.value?.scenarios.filter(scenario => scenario.enabled).length ?? 0)
+const gameBoardConfigs = computed(() => {
+  return (snapshot.value?.boardConfigs ?? []).filter(board =>
+    board.gameCode === selectedGameCode.value && board.enabled
+  )
+})
+const selectedBoard = computed<BoardConfig | undefined>(() => {
+  return gameBoardConfigs.value.find(board => board.boardId === selectedBoardKey.value)
+})
 const collectScenarioCount = computed(() => snapshot.value?.scenarios.filter(scenario => scenario.nextStep === 'collect').length ?? 0)
 
 watch([selectedScenarioId, snapshot], syncEditableScenario)
 watch(selectedGameCode, () => {
   selectedScenarioId.value = gameScenarios.value[0]?.id || ''
+  selectedBoardKey.value = ''
   syncEditableScenario()
 })
 watch([screenText, lineWinsText], validateJson)
@@ -202,6 +251,13 @@ function syncEditableScenario() {
   screenText.value = editableScenario.value ? JSON.stringify(editableScenario.value.screen, null, 2) : ''
   lineWinsText.value = editableScenario.value ? JSON.stringify(editableScenario.value.lineWins || [], null, 2) : ''
   validateJson()
+}
+
+function applySelectedBoard() {
+  if (!selectedBoard.value) return
+  screenText.value = JSON.stringify(selectedBoard.value.screen, null, 2)
+  validateJson()
+  appStore.showSuccess('棋盘模板已应用到当前场景')
 }
 
 function validateJson() {

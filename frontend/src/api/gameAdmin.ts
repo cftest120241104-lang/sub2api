@@ -3,6 +3,7 @@ import gameServiceAPI, {
   type GameRound,
   type GameSession,
   type GameScenarioDefinition,
+  type GameBoardConfig,
   type OpsChannelCatalogItem,
   type OpsChannelGameConfig,
   type OpsGameCatalogItem,
@@ -17,6 +18,7 @@ export type ChannelGameConfig = OpsChannelGameConfig
 export type ScenarioConfig = GameScenarioDefinition & {
   gameCode: string
 }
+export type BoardConfig = GameBoardConfig
 
 export interface PlayerSessionOverview {
   channelCode: string
@@ -95,6 +97,7 @@ export interface GameAdminSnapshot {
   games: GameAdminGame[]
   configs: ChannelGameConfig[]
   scenarios: ScenarioConfig[]
+  boardConfigs: BoardConfig[]
   players: PlayerSessionOverview[]
   spins: SpinRecordOverview[]
   channelMetrics: ChannelMetric[]
@@ -206,13 +209,14 @@ function buildMetrics(
 }
 
 export async function loadGameAdminSnapshot(): Promise<GameAdminSnapshot> {
-  const [health, ready, summary, channels, games, configs] = await Promise.all([
+  const [health, ready, summary, channels, games, configs, boardConfigs] = await Promise.all([
     gameServiceAPI.getHealth(),
     gameServiceAPI.getReady(),
     gameServiceAPI.getOpsSummary(),
     gameServiceAPI.getChannels(),
     gameServiceAPI.getGames(),
     gameServiceAPI.getChannelGameConfigs(),
+    gameServiceAPI.getBoardConfigs(),
   ])
   const players = mapPlayers(summary)
   const spins = mapSpins(summary)
@@ -237,6 +241,7 @@ export async function loadGameAdminSnapshot(): Promise<GameAdminSnapshot> {
     games,
     configs,
     scenarios,
+    boardConfigs,
     players,
     spins,
     ...metrics,
