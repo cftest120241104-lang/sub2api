@@ -45,6 +45,11 @@
    - 展示服务地址、注册游戏、场景数量和运行状态。
    - 后续渠道、游戏启停配置在第二阶段细化。
 
+11. RTP 与棋盘控制
+   - 页面：`/admin/rtp-control`
+   - 接口：`/admin/ops/rtp-control`、`/admin/ops/rtp-profiles`、`/admin/ops/rtp-rules`、`/admin/ops/rtp-runtime-stats`、`/admin/ops/board-configs`
+   - 验收：可配置 RTP 档位和多维规则；可维护棋盘模板；场景配置页可套用棋盘；Spin 成功后写入 RTP 统计。
+
 ## 第二阶段
 
 第二阶段先落入口和接口契约，避免后台页面只有口头规划。每个模块需继续补真实表结构、权限、操作审计和验证。
@@ -86,3 +91,7 @@
 - `admin/frontend/src/views/admin/GameServiceView.vue`
   - 游戏运营中心页面。
   - 第二阶段模块 endpoint 可点击查看当前契约响应。
+- `admin/frontend/src/views/admin/RtpControlView.vue`
+  - RTP 档位、规则、棋盘模板和运行统计管理页面。
+- `admin/frontend/src/views/admin/ScenarioConfigsView.vue`
+  - 场景配置页面，可套用棋盘模板到场景盘面。
