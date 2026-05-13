@@ -359,9 +359,12 @@ export interface RtpProfile {
 export interface RtpScenarioWeight {
   scenarioId: string
   weight: number
+  boardId?: string
   minRtpGapPermille?: number
   maxRtpGapPermille?: number
 }
+
+export type RtpStatsWindow = 'lifetime' | 'daily' | 'hourly'
 
 export interface RtpRule {
   ruleId: string
@@ -371,13 +374,23 @@ export interface RtpRule {
   gameCode?: string
   currency?: string
   playerSegment: string
+  deviceType?: string
+  countryCode?: string
+  regionCode?: string
+  vipLevel?: string
+  campaignId?: string
+  trafficSource?: string
   minBetCents?: number
   maxBetCents?: number
+  minBalanceCents?: number
+  maxBalanceCents?: number
   activeFrom?: string
   activeUntil?: string
   profileId?: string
   targetRtpPermille?: number
   tolerancePermille?: number
+  boardId?: string
+  statsWindow: RtpStatsWindow
   scenarioWeights: RtpScenarioWeight[]
   conditions: Record<string, unknown>
   enabled: boolean
@@ -392,6 +405,13 @@ export interface RtpRuntimeStats {
   ruleId: string
   playerSegment: string
   currency: string
+  deviceType?: string
+  countryCode?: string
+  vipLevel?: string
+  campaignId?: string
+  trafficSource?: string
+  statsWindow: RtpStatsWindow
+  statsPeriod: string
   bucketKey: string
   rounds: number
   totalBetCents: number

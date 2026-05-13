@@ -6,7 +6,7 @@
           <div>
             <h1 class="text-xl font-semibold text-gray-900 dark:text-white">RTP 与棋盘控制</h1>
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              按渠道、游戏、币种、玩家分层、投注区间和时间窗配置 RTP 档位、命中规则、棋盘模板和运行统计。
+              按渠道、游戏、币种、玩家分层、设备、地区、VIP、活动、余额和时间窗配置 RTP 档位、命中规则、棋盘模板和运行统计。
             </p>
           </div>
           <button type="button" class="btn btn-secondary btn-sm" :disabled="loading" @click="load">
@@ -144,7 +144,8 @@
                     <th>规则</th>
                     <th>范围</th>
                     <th>档位</th>
-                    <th>投注区间</th>
+                    <th>细分维度</th>
+                    <th>投注 / 余额</th>
                     <th>状态</th>
                     <th></th>
                   </tr>
@@ -159,7 +160,13 @@
                       {{ rule.channelCode || '*' }} / {{ rule.gameCode || '*' }} / {{ rule.currency || '*' }} / {{ rule.playerSegment }}
                     </td>
                     <td>{{ rule.profileId || permilleLabel(rule.targetRtpPermille || 0) }}</td>
-                    <td>{{ centsLabel(rule.minBetCents) }} - {{ centsLabel(rule.maxBetCents) }}</td>
+                    <td class="font-mono text-xs">
+                      {{ rule.deviceType || '*' }} / {{ rule.countryCode || '*' }} / {{ rule.vipLevel || '*' }} / {{ rule.campaignId || '*' }}
+                    </td>
+                    <td class="font-mono text-xs">
+                      {{ centsLabel(rule.minBetCents) }} - {{ centsLabel(rule.maxBetCents) }}<br />
+                      {{ centsLabel(rule.minBalanceCents) }} - {{ centsLabel(rule.maxBalanceCents) }}
+                    </td>
                     <td>
                       <StatusBadge :status="rule.enabled ? 'success' : 'inactive'" :label="rule.enabled ? '启用' : '停用'" />
                     </td>
@@ -213,12 +220,44 @@
                   <input v-model.trim="ruleForm.playerSegment" class="input" />
                 </div>
                 <div>
+                  <label class="input-label">设备类型</label>
+                  <input v-model.trim="ruleForm.deviceType" class="input" placeholder="mobile / desktop / tablet" />
+                </div>
+                <div>
+                  <label class="input-label">国家</label>
+                  <input v-model.trim="ruleForm.countryCode" class="input" placeholder="例如 US、BR、PH" />
+                </div>
+                <div>
+                  <label class="input-label">地区</label>
+                  <input v-model.trim="ruleForm.regionCode" class="input" placeholder="省州或运营区域" />
+                </div>
+                <div>
+                  <label class="input-label">VIP 等级</label>
+                  <input v-model.trim="ruleForm.vipLevel" class="input" placeholder="bronze / gold / vip1" />
+                </div>
+                <div>
+                  <label class="input-label">活动 ID</label>
+                  <input v-model.trim="ruleForm.campaignId" class="input" placeholder="留空表示全部活动" />
+                </div>
+                <div>
+                  <label class="input-label">流量来源</label>
+                  <input v-model.trim="ruleForm.trafficSource" class="input" placeholder="organic / ads / affiliate" />
+                </div>
+                <div>
                   <label class="input-label">最小投注分</label>
                   <input v-model.number="ruleForm.minBetCents" type="number" min="1" class="input" />
                 </div>
                 <div>
                   <label class="input-label">最大投注分</label>
                   <input v-model.number="ruleForm.maxBetCents" type="number" min="1" class="input" />
+                </div>
+                <div>
+                  <label class="input-label">最小余额分</label>
+                  <input v-model.number="ruleForm.minBalanceCents" type="number" min="1" class="input" />
+                </div>
+                <div>
+                  <label class="input-label">最大余额分</label>
+                  <input v-model.number="ruleForm.maxBalanceCents" type="number" min="1" class="input" />
                 </div>
               </div>
               <div>
@@ -240,6 +279,30 @@
                   <input v-model.number="ruleForm.tolerancePermille" type="number" min="0" max="1000" class="input" />
                 </div>
               </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label class="input-label">默认棋盘模板</label>
+                  <select v-model="ruleForm.boardId" class="input">
+                    <option value="">不覆盖棋盘</option>
+                    <option v-for="board in matchingBoards" :key="`${board.gameCode}:${board.boardId}`" :value="board.boardId">
+                      {{ board.label }} / {{ board.boardId }}
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label class="input-label">统计周期</label>
+                  <select v-model="ruleForm.statsWindow" class="input">
+                    <option value="lifetime">长期累计</option>
+                    <option value="daily">按天</option>
+                    <option value="hourly">按小时</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="input-label">扩展条件 JSON</label>
+                <textarea v-model="conditionsText" class="input min-h-28 font-mono text-xs"></textarea>
+                <p v-if="conditionsJsonError" class="input-error-text">{{ conditionsJsonError }}</p>
+              </div>
               <div>
                 <label class="input-label">场景权重 JSON</label>
                 <textarea v-model="scenarioWeightsText" class="input min-h-40 font-mono text-xs"></textarea>
@@ -252,7 +315,7 @@
                 </span>
                 <input v-model="ruleForm.enabled" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
               </label>
-              <button type="button" class="btn btn-primary w-full" :disabled="savingRule || Boolean(ruleJsonError)" @click="submitRule">
+              <button type="button" class="btn btn-primary w-full" :disabled="savingRule || Boolean(ruleJsonError || conditionsJsonError)" @click="submitRule">
                 <Icon name="check" size="sm" />
                 {{ savingRule ? '保存中' : '保存规则' }}
               </button>
@@ -364,10 +427,14 @@
               </thead>
               <tbody>
                 <tr v-for="stat in filteredStats" :key="stat.bucketKey">
-                  <td class="font-mono text-xs">{{ stat.channelCode }} / {{ stat.gameCode }} / {{ stat.currency }} / {{ stat.playerSegment }}</td>
+                  <td class="font-mono text-xs">
+                    {{ stat.channelCode }} / {{ stat.gameCode }} / {{ stat.currency }} / {{ stat.playerSegment }}<br />
+                    {{ stat.deviceType || '*' }} / {{ stat.countryCode || '*' }} / {{ stat.vipLevel || '*' }} / {{ stat.campaignId || '*' }}
+                  </td>
                   <td>
                     <div class="font-mono text-xs text-gray-900 dark:text-white">{{ stat.profileId }}</div>
                     <div class="font-mono text-xs text-gray-500">{{ stat.ruleId }}</div>
+                    <div class="font-mono text-xs text-gray-500">{{ stat.statsWindow }} / {{ stat.statsPeriod }}</div>
                   </td>
                   <td>{{ formatNumber(stat.rounds) }}</td>
                   <td>{{ centsLabel(stat.totalBetCents) }}</td>
@@ -400,6 +467,7 @@ import gameServiceAPI, {
   type RtpControlOverview,
   type RtpProfile,
   type RtpRule,
+  type RtpStatsWindow,
 } from '@/api/gameService'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -421,6 +489,8 @@ const games = ref<OpsGameCatalogItem[]>([])
 const activeTab = ref<TabKey>('profiles')
 const scenarioWeightsText = ref('')
 const ruleJsonError = ref('')
+const conditionsText = ref('{}')
+const conditionsJsonError = ref('')
 const boardScreenText = ref('')
 const boardTagsText = ref('')
 const boardJsonError = ref('')
@@ -458,11 +528,21 @@ const ruleForm = reactive({
   gameCode: 'vs10jokerhot',
   currency: '',
   playerSegment: 'default',
+  deviceType: '',
+  countryCode: '',
+  regionCode: '',
+  vipLevel: '',
+  campaignId: '',
+  trafficSource: '',
   minBetCents: undefined as number | undefined,
   maxBetCents: undefined as number | undefined,
+  minBalanceCents: undefined as number | undefined,
+  maxBalanceCents: undefined as number | undefined,
   profileId: 'default-965',
   targetRtpPermille: undefined as number | undefined,
   tolerancePermille: undefined as number | undefined,
+  boardId: '',
+  statsWindow: 'lifetime' as RtpStatsWindow,
   enabled: true,
 })
 
@@ -499,10 +579,24 @@ const filteredStats = computed(() => {
     stat.ruleId,
     stat.playerSegment,
     stat.currency,
-  ].some(value => value.toLowerCase().includes(query)))
+    stat.deviceType,
+    stat.countryCode,
+    stat.vipLevel,
+    stat.campaignId,
+    stat.trafficSource,
+    stat.statsWindow,
+    stat.statsPeriod,
+  ].some(value => (value || '').toLowerCase().includes(query)))
+})
+
+const matchingBoards = computed(() => {
+  const boards = overview.value?.boardConfigs ?? []
+  if (!ruleForm.gameCode) return boards
+  return boards.filter(board => board.gameCode === ruleForm.gameCode)
 })
 
 watch(scenarioWeightsText, validateScenarioWeights)
+watch(conditionsText, validateConditions)
 watch(boardScreenText, validateBoardScreen)
 
 function applyProfile(profile: Partial<RtpProfile>) {
@@ -522,13 +616,24 @@ function applyRule(rule: Partial<RtpRule>) {
   ruleForm.gameCode = rule.gameCode || ''
   ruleForm.currency = rule.currency || ''
   ruleForm.playerSegment = rule.playerSegment || 'default'
+  ruleForm.deviceType = rule.deviceType || ''
+  ruleForm.countryCode = rule.countryCode || ''
+  ruleForm.regionCode = rule.regionCode || ''
+  ruleForm.vipLevel = rule.vipLevel || ''
+  ruleForm.campaignId = rule.campaignId || ''
+  ruleForm.trafficSource = rule.trafficSource || ''
   ruleForm.minBetCents = rule.minBetCents
   ruleForm.maxBetCents = rule.maxBetCents
+  ruleForm.minBalanceCents = rule.minBalanceCents
+  ruleForm.maxBalanceCents = rule.maxBalanceCents
   ruleForm.profileId = rule.profileId || ''
   ruleForm.targetRtpPermille = rule.targetRtpPermille
   ruleForm.tolerancePermille = rule.tolerancePermille
+  ruleForm.boardId = rule.boardId || ''
+  ruleForm.statsWindow = rule.statsWindow || 'lifetime'
   ruleForm.enabled = rule.enabled ?? true
   scenarioWeightsText.value = JSON.stringify(rule.scenarioWeights || [{ scenarioId: 'no-win', weight: 1 }], null, 2)
+  conditionsText.value = JSON.stringify(rule.conditions || {}, null, 2)
 }
 
 function applyBoard(board: Partial<GameBoardConfig>) {
@@ -597,6 +702,16 @@ function validateScenarioWeights() {
   }
 }
 
+function validateConditions() {
+  try {
+    const parsed = JSON.parse(conditionsText.value || '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('扩展条件必须是 JSON 对象')
+    conditionsJsonError.value = ''
+  } catch (error) {
+    conditionsJsonError.value = error instanceof Error ? error.message : '扩展条件 JSON 非法'
+  }
+}
+
 function validateBoardScreen() {
   try {
     const parsed = JSON.parse(boardScreenText.value || '{}') as GameReelScreen
@@ -642,7 +757,8 @@ async function submitProfile() {
 
 async function submitRule() {
   validateScenarioWeights()
-  if (ruleJsonError.value) return
+  validateConditions()
+  if (ruleJsonError.value || conditionsJsonError.value) return
   savingRule.value = true
   try {
     await gameServiceAPI.saveRtpRule({
@@ -650,13 +766,22 @@ async function submitRule() {
       channelCode: ruleForm.channelCode || undefined,
       gameCode: ruleForm.gameCode || undefined,
       currency: ruleForm.currency || undefined,
+      deviceType: ruleForm.deviceType || undefined,
+      countryCode: ruleForm.countryCode || undefined,
+      regionCode: ruleForm.regionCode || undefined,
+      vipLevel: ruleForm.vipLevel || undefined,
+      campaignId: ruleForm.campaignId || undefined,
+      trafficSource: ruleForm.trafficSource || undefined,
       profileId: ruleForm.profileId || undefined,
+      boardId: ruleForm.boardId || undefined,
       minBetCents: optionalNumber(ruleForm.minBetCents),
       maxBetCents: optionalNumber(ruleForm.maxBetCents),
+      minBalanceCents: optionalNumber(ruleForm.minBalanceCents),
+      maxBalanceCents: optionalNumber(ruleForm.maxBalanceCents),
       targetRtpPermille: optionalNumber(ruleForm.targetRtpPermille),
       tolerancePermille: optionalNumber(ruleForm.tolerancePermille),
       scenarioWeights: JSON.parse(scenarioWeightsText.value),
-      conditions: {},
+      conditions: JSON.parse(conditionsText.value || '{}'),
     })
     await load()
     appStore.showSuccess('RTP 规则已保存')
