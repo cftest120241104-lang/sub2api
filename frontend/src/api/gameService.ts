@@ -39,6 +39,11 @@ export interface GameScenario {
   id: string
   label: string
   description: string
+  outcomeType?: string
+  payoutMultiplier?: number
+  nextStep?: string
+  requiresCollect?: boolean
+  enabled?: boolean
 }
 
 export interface GmScenarioState {
@@ -281,6 +286,90 @@ export interface GameOpsSummary {
   secondStage: SecondStageModule[]
 }
 
+export interface GameScenarioDefinition extends GameScenario {
+  outcomeType: 'noWin' | 'lineWin' | 'bigWin' | 'specialWin' | 'jackpot'
+  payoutMultiplier: number
+  nextStep: 'idle' | 'collect' | 'bonus' | 'freeSpinBonus'
+  screen: {
+    rows: number
+    columns: number
+    symbols: number[]
+    symbolsAbove: number[]
+    symbolsBelow: number[]
+  } | Array<{
+    rows: number
+    columns: number
+    symbols: number[]
+    symbolsAbove: number[]
+    symbolsBelow: number[]
+  }>
+  lineWins?: Array<{
+    lineIndex: number
+    payoutMultiplier: number
+    positions: number[]
+  }>
+  jackpotLevel?: number
+  enabled: boolean
+}
+
+export interface OpsChannelCatalogItem {
+  code: string
+  name: string
+  walletMode: 'internal' | 'seamless'
+  enabled: boolean
+  status: 'enabled' | 'disabled' | 'maintenance' | 'testing'
+  operator: string
+  region: string
+  currency: string
+  settlementCycle: string
+  sharePercent: number
+  apiMode: 'direct' | 'aggregator' | 'sandbox'
+  minBetCents: number
+  maxBetCents: number
+  dailyLimitCents: number
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsGameCatalogItem {
+  code: string
+  name: string
+  protocol: string
+  enabled: boolean
+  status: 'enabled' | 'disabled' | 'maintenance' | 'testing'
+  provider: string
+  category: string
+  defaultRtp: number
+  volatility: 'low' | 'medium' | 'high'
+  lines: number
+  minBetCents: number
+  maxBetCents: number
+  releaseVersion: string
+  tags: string[]
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OpsChannelGameConfig {
+  id: string
+  channelCode: string
+  gameCode: string
+  enabled: boolean
+  status: 'enabled' | 'disabled' | 'maintenance' | 'testing'
+  sharePercent: number
+  rtp: number
+  minBetCents: number
+  maxBetCents: number
+  jackpotEnabled: boolean
+  featureFlags: string[]
+  launchPath: string
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
 export interface CreateGameSessionParams {
   channelCode: string
   gameCode: string
@@ -393,6 +482,36 @@ export async function getOpsSummary(): Promise<GameOpsSummary> {
 
 export async function getPlayers(): Promise<PlayerSummary[]> {
   const { data } = await gameServiceClient.get<PlayerSummary[]>('/admin/ops/players')
+  return data
+}
+
+export async function getChannels(): Promise<OpsChannelCatalogItem[]> {
+  const { data } = await gameServiceClient.get<OpsChannelCatalogItem[]>('/admin/ops/channels')
+  return data
+}
+
+export async function getGames(): Promise<OpsGameCatalogItem[]> {
+  const { data } = await gameServiceClient.get<OpsGameCatalogItem[]>('/admin/ops/games')
+  return data
+}
+
+export async function getChannelGameConfigs(): Promise<OpsChannelGameConfig[]> {
+  const { data } = await gameServiceClient.get<OpsChannelGameConfig[]>('/admin/ops/channel-games')
+  return data
+}
+
+export async function saveChannelGameConfig(payload: Partial<OpsChannelGameConfig>): Promise<OpsChannelGameConfig> {
+  const { data } = await gameServiceClient.post<OpsChannelGameConfig>('/admin/ops/channel-games', payload)
+  return data
+}
+
+export async function getScenarioConfigs(gameCode: string): Promise<GameScenarioDefinition[]> {
+  const { data } = await gameServiceClient.get<GameScenarioDefinition[]>(`/admin/ops/games/${gameCode}/scenario-configs`)
+  return data
+}
+
+export async function saveScenarioConfig(gameCode: string, payload: Partial<GameScenarioDefinition>): Promise<GameScenarioDefinition> {
+  const { data } = await gameServiceClient.post<GameScenarioDefinition>(`/admin/ops/games/${gameCode}/scenario-configs`, payload)
   return data
 }
 
@@ -535,6 +654,12 @@ export const gameServiceAPI = {
   collectGame,
   getOpsSummary,
   getPlayers,
+  getChannels,
+  getGames,
+  getChannelGameConfigs,
+  saveChannelGameConfig,
+  getScenarioConfigs,
+  saveScenarioConfig,
   getSecondStageModules,
   getSecondStageContract,
   getSecondStageSnapshot,

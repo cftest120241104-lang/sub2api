@@ -102,6 +102,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/scenarios',
+    name: 'AdminScenarioConfigs',
+    component: () => import('@/views/admin/ScenarioConfigsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: '场景配置'
+    }
+  },
+  {
     path: '/admin/players',
     name: 'AdminPlayerSessions',
     component: () => import('@/views/admin/PlayerSessionsView.vue'),

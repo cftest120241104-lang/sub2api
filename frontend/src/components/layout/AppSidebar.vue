@@ -109,6 +109,7 @@ const navItems: NavItem[] = [
   { path: '/admin/channels', label: '渠道管理', icon: 'globe' },
   { path: '/admin/games', label: '游戏管理', icon: 'badge' },
   { path: '/admin/channel-games', label: '渠道游戏配置', icon: 'swap' },
+  { path: '/admin/scenarios', label: '场景配置', icon: 'beaker' },
   { path: '/admin/players', label: '玩家 / 会话', icon: 'users' },
   { path: '/admin/spins', label: 'Spin / 注单', icon: 'clipboard' },
   { path: '/admin/game-service', label: '游戏服务调试', icon: 'server' },

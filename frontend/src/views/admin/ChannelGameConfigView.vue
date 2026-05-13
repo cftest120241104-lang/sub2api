@@ -14,10 +14,6 @@
               <Icon name="refresh" size="sm" />
               {{ loading ? '刷新中' : '刷新' }}
             </button>
-            <button type="button" class="btn btn-secondary btn-sm" @click="resetConfigs">
-              <Icon name="sync" size="sm" />
-              重置配置
-            </button>
           </div>
         </div>
       </section>
@@ -203,7 +199,6 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   formatGameMoney,
   loadGameAdminSnapshot,
-  resetChannelGameConfigs,
   saveChannelGameConfig,
   statusLabel,
   statusVariant,
@@ -346,12 +341,6 @@ async function saveConfig() {
   } finally {
     saving.value = false
   }
-}
-
-async function resetConfigs() {
-  resetChannelGameConfigs()
-  await load()
-  appStore.showSuccess('渠道游戏配置已重置')
 }
 
 onMounted(() => {

@@ -204,15 +204,15 @@ const scenarioState = ref<GmScenarioState | null>(null)
 const lastProtocol = ref<ProtocolPayload | null>(null)
 
 const sessionForm = reactive({
-  channelCode: 'demo',
+  channelCode: 'platform',
   gameCode: 'vs10jokerhot',
-  playerId: `admin-test-${Date.now()}`,
+  playerId: `ops-test-${Date.now()}`,
   currency: 'USD',
 })
 
 const spinForm = reactive({
   coin: '1.00',
-  lines: 20,
+  lines: 10,
   roundId: createRoundId(),
 })
 

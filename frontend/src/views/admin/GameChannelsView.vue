@@ -97,7 +97,7 @@
             </div>
 
             <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
-              <span>同步时间：{{ formatDate(channel.lastSyncAt) }}</span>
+              <span>更新时间：{{ formatDate(channel.updatedAt) }}</span>
               <RouterLink class="btn btn-secondary btn-sm" :to="{ path: '/admin/channel-games', query: { channel: channel.code } }">
                 配置游戏
               </RouterLink>
