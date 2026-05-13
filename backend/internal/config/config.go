@@ -78,6 +78,7 @@ type Config struct {
 	RateLimit               RateLimitConfig               `mapstructure:"rate_limit"`
 	Pricing                 PricingConfig                 `mapstructure:"pricing"`
 	Gateway                 GatewayConfig                 `mapstructure:"gateway"`
+	GameService             GameServiceConfig             `mapstructure:"game_service"`
 	APIKeyAuth              APIKeyAuthCacheConfig         `mapstructure:"api_key_auth_cache"`
 	SubscriptionCache       SubscriptionCacheConfig       `mapstructure:"subscription_cache"`
 	SubscriptionMaintenance SubscriptionMaintenanceConfig `mapstructure:"subscription_maintenance"`
@@ -513,6 +514,11 @@ type ServerConfig struct {
 	TrustedProxies     []string  `mapstructure:"trusted_proxies"`       // 可信代理列表（CIDR/IP）
 	MaxRequestBodySize int64     `mapstructure:"max_request_body_size"` // 全局最大请求体限制
 	H2C                H2CConfig `mapstructure:"h2c"`                   // HTTP/2 Cleartext 配置
+}
+
+type GameServiceConfig struct {
+	BaseURL     string `mapstructure:"base_url"`
+	AdminAPIKey string `mapstructure:"admin_api_key"`
 }
 
 // H2CConfig HTTP/2 Cleartext 配置
@@ -1328,6 +1334,8 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	cfg.Log.StacktraceLevel = strings.ToLower(strings.TrimSpace(cfg.Log.StacktraceLevel))
 	cfg.Log.Output.FilePath = strings.TrimSpace(cfg.Log.Output.FilePath)
 	cfg.Gateway.ForcedCodexInstructionsTemplateFile = strings.TrimSpace(cfg.Gateway.ForcedCodexInstructionsTemplateFile)
+	cfg.GameService.BaseURL = strings.TrimRight(strings.TrimSpace(cfg.GameService.BaseURL), "/")
+	cfg.GameService.AdminAPIKey = strings.TrimSpace(cfg.GameService.AdminAPIKey)
 	if cfg.Gateway.ForcedCodexInstructionsTemplateFile != "" {
 		content, err := os.ReadFile(cfg.Gateway.ForcedCodexInstructionsTemplateFile)
 		if err != nil {
@@ -1669,6 +1677,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.force_codex_cli", false)
 	viper.SetDefault("gateway.codex_image_generation_bridge_enabled", false)
 	viper.SetDefault("gateway.openai_passthrough_allow_timeout_headers", false)
+	viper.SetDefault("game_service.base_url", "")
+	viper.SetDefault("game_service.admin_api_key", "")
 	// OpenAI Responses WebSocket（默认开启；可通过 force_http 紧急回滚）
 	viper.SetDefault("gateway.openai_ws.enabled", true)
 	viper.SetDefault("gateway.openai_ws.mode_router_v2_enabled", false)
@@ -2318,6 +2328,11 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.IdleConnTimeoutSeconds > 180 {
 		slog.Warn("gateway.idle_conn_timeout_seconds is high; consider 60-120 seconds for better connection reuse", "idle_conn_timeout_seconds", c.Gateway.IdleConnTimeoutSeconds)
+	}
+	if c.GameService.BaseURL != "" {
+		if err := ValidateAbsoluteHTTPURL(c.GameService.BaseURL); err != nil {
+			return fmt.Errorf("game_service.base_url invalid: %w", err)
+		}
 	}
 	if c.Gateway.MaxUpstreamClients <= 0 {
 		return fmt.Errorf("gateway.max_upstream_clients must be positive")

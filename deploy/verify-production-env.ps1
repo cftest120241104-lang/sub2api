@@ -39,7 +39,9 @@ function Assert-StrongSecret {
     "password",
     "change-me",
     "change_this_secure_password",
-    "replace-with-at-least-24-random-chars"
+    "replace-with-at-least-24-random-chars",
+    "replace-with-at-least-32-random-chars",
+    "dev-game-service-admin-key-change-before-production"
   )
   if ($Value.Length -lt $MinLength -or $weakValues -contains $Value) {
     throw "$Name must be a strong fixed secret with at least $MinLength chars"
@@ -61,6 +63,9 @@ $values = Read-EnvValues $envPath
 $required = @(
   "SERVER_PORT",
   "VITE_GAME_SERVICE_BASE_URL",
+  "VITE_GAME_SERVICE_PROXY_BASE_URL",
+  "GAME_SERVICE_BASE_URL",
+  "GAME_SERVICE_ADMIN_API_KEY",
   "POSTGRES_USER",
   "POSTGRES_PASSWORD",
   "POSTGRES_DB",
@@ -85,6 +90,17 @@ if ($gameServiceUri.Scheme -ne "https" -and $gameServiceUri.Host -notin @("127.0
   throw "VITE_GAME_SERVICE_BASE_URL must use https except localhost: $gameServiceBaseUrl"
 }
 
+$proxyBaseUrl = [string]$values.VITE_GAME_SERVICE_PROXY_BASE_URL
+if (-not $proxyBaseUrl.StartsWith("/api/v1/admin/game-service")) {
+  throw "VITE_GAME_SERVICE_PROXY_BASE_URL must point to the protected admin proxy"
+}
+
+$serverGameServiceUri = $null
+$serverGameServiceBaseUrl = ([string]$values.GAME_SERVICE_BASE_URL).TrimEnd("/")
+if (-not [System.Uri]::TryCreate($serverGameServiceBaseUrl, [System.UriKind]::Absolute, [ref]$serverGameServiceUri)) {
+  throw "GAME_SERVICE_BASE_URL must be an absolute URL"
+}
+
 $email = [string]$values.ADMIN_EMAIL
 try {
   [void][System.Net.Mail.MailAddress]::new($email)
@@ -96,6 +112,7 @@ Assert-StrongSecret "POSTGRES_PASSWORD" ([string]$values.POSTGRES_PASSWORD) 24
 Assert-StrongSecret "ADMIN_PASSWORD" ([string]$values.ADMIN_PASSWORD) 12
 Assert-StrongSecret "JWT_SECRET" ([string]$values.JWT_SECRET) 32
 Assert-StrongSecret "TOTP_ENCRYPTION_KEY" ([string]$values.TOTP_ENCRYPTION_KEY) 32
+Assert-StrongSecret "GAME_SERVICE_ADMIN_API_KEY" ([string]$values.GAME_SERVICE_ADMIN_API_KEY) 32
 
 if ($values.ContainsKey("SECURITY_URL_ALLOWLIST_ENABLED") -and [string]$values.SECURITY_URL_ALLOWLIST_ENABLED -ne "true") {
   Write-Warning "SECURITY_URL_ALLOWLIST_ENABLED is not true; enable it before public production exposure."

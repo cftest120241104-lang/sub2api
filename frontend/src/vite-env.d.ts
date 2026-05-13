@@ -3,6 +3,7 @@
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
   readonly VITE_GAME_SERVICE_BASE_URL?: string
+  readonly VITE_GAME_SERVICE_PROXY_BASE_URL?: string
   readonly BASE_URL: string
 }
 

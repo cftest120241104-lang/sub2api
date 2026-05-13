@@ -6,14 +6,26 @@
  */
 import axios, { type AxiosInstance } from 'axios'
 
-const DEFAULT_GAME_SERVICE_BASE_URL = 'http://127.0.0.1:3100'
+const DEFAULT_GAME_SERVICE_BASE_URL = '/api/v1/admin/game-service'
 const GAME_SERVICE_BASE_URL = (
-  import.meta.env.VITE_GAME_SERVICE_BASE_URL || DEFAULT_GAME_SERVICE_BASE_URL
+  import.meta.env.VITE_GAME_SERVICE_PROXY_BASE_URL ||
+  import.meta.env.VITE_GAME_SERVICE_BASE_URL ||
+  DEFAULT_GAME_SERVICE_BASE_URL
 ).replace(/\/+$/, '')
 
 const gameServiceClient: AxiosInstance = axios.create({
   baseURL: GAME_SERVICE_BASE_URL,
   timeout: 15000,
+})
+
+gameServiceClient.interceptors.request.use((config) => {
+  if (GAME_SERVICE_BASE_URL.startsWith('/')) {
+    const token = localStorage.getItem('auth_token')
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  }
+  return config
 })
 
 export interface GameHealth {
