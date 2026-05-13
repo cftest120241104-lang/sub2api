@@ -4,70 +4,47 @@
       <section class="card p-6">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h1 class="text-xl font-semibold text-gray-900 dark:text-white">
-              游戏运营中心
-            </h1>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              覆盖游戏服务健康、玩家、注单、钱包流水、GM 调试、审计日志、报表导出和第二阶段模块契约。
+            <h1 class="text-xl font-semibold text-gray-900 dark:text-white">游戏服务调试</h1>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              直连 Pragmatic gameService，创建测试会话并执行 doInit / doSpin / doCollect。
             </p>
-            <p class="mt-2 font-mono text-xs text-gray-500 dark:text-gray-400">
-              {{ gameServiceAPI.baseUrl }}
-            </p>
+            <p class="mt-2 font-mono text-xs text-gray-500 dark:text-gray-400">{{ gameServiceAPI.baseUrl }}</p>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingStatus || loadingOps" @click="reloadAll">
-              <Icon name="refresh" size="sm" />
-              {{ loadingStatus || loadingOps ? t('common.loading') : t('common.refresh') }}
-            </button>
-            <button type="button" class="btn btn-primary btn-sm" :disabled="exporting || !opsSummary" @click="downloadOpsCsv">
-              <Icon name="download" size="sm" />
-              {{ exporting ? t('common.loading') : '导出 CSV' }}
-            </button>
-          </div>
+          <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingStatus" @click="loadStatus">
+            <Icon name="refresh" size="sm" />
+            {{ loadingStatus ? '检查中' : '检查状态' }}
+          </button>
         </div>
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-500 dark:text-gray-400">服务健康</span>
+              <span class="text-sm text-gray-500 dark:text-gray-400">Health</span>
               <StatusBadge :status="health?.ok ? 'success' : 'error'" :label="health?.ok ? 'OK' : 'ERR'" />
             </div>
-            <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">
-              {{ health?.service || t('common.notAvailable') }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ formatDate(health?.time) }}</p>
+            <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ health?.service || '未连接' }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ health?.time ? formatDate(health.time) : '-' }}</p>
           </div>
 
           <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-500 dark:text-gray-400">就绪状态</span>
-              <StatusBadge :status="ready?.ok ? 'success' : 'error'" :label="ready?.ok ? 'READY' : 'DOWN'" />
+              <span class="text-sm text-gray-500 dark:text-gray-400">Ready</span>
+              <StatusBadge :status="ready?.ok ? 'success' : 'warning'" :label="ready?.ok ? 'READY' : '降级'" />
             </div>
-            <div class="mt-3 space-y-2 text-xs">
-              <div v-for="item in readyChecks" :key="item.name" class="flex items-center justify-between gap-3">
+            <div class="mt-3 space-y-1 text-xs">
+              <div v-for="item in readyChecks" :key="item.name" class="flex justify-between gap-3">
                 <span class="text-gray-600 dark:text-gray-300">{{ item.name }}</span>
-                <span :class="item.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                <span :class="item.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'">
                   {{ item.ok ? 'OK' : item.error || 'ERR' }}
                 </span>
               </div>
-              <p v-if="readyChecks.length === 0" class="text-gray-500 dark:text-gray-400">
-                {{ t('common.noData') }}
-              </p>
+              <p v-if="readyChecks.length === 0" class="text-gray-500 dark:text-gray-400">暂无检查项</p>
             </div>
           </div>
 
-          <MetricCard label="活跃会话" :value="opsSummary?.totals.activeSessions ?? 0" hint="当前未过期 token" />
-          <MetricCard label="平台净额" :value="formatMoney(opsSummary?.totals.netCents ?? 0)" hint="下注减派彩" />
+          <MetricCard title="最近玩家" :value="snapshot?.totals.players ?? 0" icon="users" hint="运营接口聚合" />
+          <MetricCard title="最近 Spin" :value="snapshot?.totals.spins ?? 0" icon="play" tone="warning" hint="运营接口聚合" />
         </div>
-      </section>
-
-      <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <MetricCard label="游戏数" :value="opsSummary?.totals.games ?? 0" hint="已注册 gameCode" />
-        <MetricCard label="玩家数" :value="opsSummary?.totals.players ?? 0" hint="按渠道/币种去重" />
-        <MetricCard label="注单数" :value="opsSummary?.totals.rounds ?? 0" hint="rounds 表" />
-        <MetricCard label="总下注" :value="formatMoney(opsSummary?.totals.totalBetCents ?? 0)" hint="stake 累计" />
-        <MetricCard label="总派彩" :value="formatMoney(opsSummary?.totals.totalWinCents ?? 0)" hint="win 累计" />
-        <MetricCard label="审计事件" :value="opsSummary?.totals.auditEvents ?? 0" hint="最近 100 条" />
       </section>
 
       <section class="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -93,18 +70,18 @@
               </div>
               <button type="button" class="btn btn-primary w-full" :disabled="creatingSession" @click="startSession">
                 <Icon name="play" size="sm" />
-                {{ creatingSession ? t('common.loading') : '创建并初始化' }}
+                {{ creatingSession ? '创建中' : '创建并初始化' }}
               </button>
             </div>
           </div>
 
           <div class="card p-6">
-            <h2 class="text-base font-semibold text-gray-900 dark:text-white">当前测试会话</h2>
+            <h2 class="text-base font-semibold text-gray-900 dark:text-white">当前会话</h2>
             <p class="mt-3 truncate font-mono text-xs text-gray-900 dark:text-white">
               {{ session?.token || '尚未创建会话' }}
             </p>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {{ session ? `${session.playerId} / ${session.currency} / ${session.gameCode}` : '创建会话后可切换 GM 场景并发起协议动作' }}
+              {{ session ? `${session.channelCode} / ${session.gameCode} / ${session.playerId}` : '创建后可执行协议动作' }}
             </p>
           </div>
         </div>
@@ -120,7 +97,7 @@
               </div>
               <button type="button" class="btn btn-secondary btn-sm" :disabled="!session || loadingScenario" @click="loadScenario">
                 <Icon name="sync" size="sm" />
-                {{ loadingScenario ? t('common.loading') : '加载场景' }}
+                {{ loadingScenario ? '加载中' : '加载场景' }}
               </button>
             </div>
 
@@ -141,14 +118,16 @@
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ scenario.description }}</p>
               </button>
             </div>
-            <EmptyState v-else text="暂无 GM 场景数据" />
+            <div v-else class="mt-5 rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400">
+              暂无 GM 场景数据
+            </div>
           </div>
 
           <div class="card p-6">
             <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">协议测试</h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">执行 doInit / doSpin / doCollect 并回写注单、钱包与审计。</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">执行基础 Pragmatic 协议动作并查看原始响应。</p>
               </div>
               <div class="flex flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary btn-sm" :disabled="!session || protocolLoading" @click="runInit">doInit</button>
@@ -187,307 +166,42 @@
           </div>
         </div>
       </section>
-
-      <section class="grid gap-6 2xl:grid-cols-2">
-        <DataTable title="玩家概览" :loading="loadingOps" :empty="!opsSummary?.topPlayers.length">
-          <template #default>
-            <thead class="bg-gray-50 text-left text-xs text-gray-500 dark:bg-dark-900 dark:text-gray-400">
-              <tr>
-                <th class="px-4 py-3">玩家</th>
-                <th class="px-4 py-3">游戏</th>
-                <th class="px-4 py-3 text-right">余额</th>
-                <th class="px-4 py-3 text-right">局数</th>
-                <th class="px-4 py-3 text-right">平台净额</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-sm dark:divide-dark-700">
-              <tr v-for="player in opsSummary?.topPlayers" :key="`${player.channelCode}:${player.playerId}:${player.currency}`">
-                <td class="px-4 py-3">
-                  <div class="font-medium text-gray-900 dark:text-white">{{ player.playerId }}</div>
-                  <div class="text-xs text-gray-500">{{ player.channelCode }} / {{ player.currency }}</div>
-                </td>
-                <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ player.gameCode || '-' }}</td>
-                <td class="px-4 py-3 text-right font-mono">{{ formatMoney(player.balanceCents) }}</td>
-                <td class="px-4 py-3 text-right">{{ player.rounds }}</td>
-                <td class="px-4 py-3 text-right font-mono" :class="player.netCents >= 0 ? 'text-green-600' : 'text-red-600'">{{ formatMoney(player.netCents) }}</td>
-              </tr>
-            </tbody>
-          </template>
-        </DataTable>
-
-        <DataTable title="最近注单" :loading="loadingOps" :empty="!opsSummary?.recentRounds.length">
-          <template #default>
-            <thead class="bg-gray-50 text-left text-xs text-gray-500 dark:bg-dark-900 dark:text-gray-400">
-              <tr>
-                <th class="px-4 py-3">局 ID</th>
-                <th class="px-4 py-3">玩家</th>
-                <th class="px-4 py-3">状态</th>
-                <th class="px-4 py-3 text-right">下注</th>
-                <th class="px-4 py-3 text-right">派彩</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-sm dark:divide-dark-700">
-              <tr v-for="round in opsSummary?.recentRounds" :key="round.roundId">
-                <td class="max-w-[180px] truncate px-4 py-3 font-mono text-xs" :title="round.roundId">{{ round.roundId }}</td>
-                <td class="px-4 py-3">
-                  <div class="text-gray-900 dark:text-white">{{ round.playerId }}</div>
-                  <div class="text-xs text-gray-500">{{ round.gameCode }} / {{ round.scenarioId }}</div>
-                </td>
-                <td class="px-4 py-3"><StatusBadge :status="round.status === 'FAILED' ? 'error' : 'success'" :label="round.status" /></td>
-                <td class="px-4 py-3 text-right font-mono">{{ formatMoney(round.stakeCents) }}</td>
-                <td class="px-4 py-3 text-right font-mono">{{ formatMoney(round.winCents) }}</td>
-              </tr>
-            </tbody>
-          </template>
-        </DataTable>
-
-        <DataTable title="钱包流水" :loading="loadingOps" :empty="!opsSummary?.recentTransactions.length">
-          <template #default>
-            <thead class="bg-gray-50 text-left text-xs text-gray-500 dark:bg-dark-900 dark:text-gray-400">
-              <tr>
-                <th class="px-4 py-3">交易</th>
-                <th class="px-4 py-3">玩家</th>
-                <th class="px-4 py-3">类型</th>
-                <th class="px-4 py-3 text-right">金额</th>
-                <th class="px-4 py-3 text-right">余额</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-sm dark:divide-dark-700">
-              <tr v-for="tx in opsSummary?.recentTransactions" :key="`${tx.channelCode}:${tx.txId}`">
-                <td class="max-w-[180px] truncate px-4 py-3 font-mono text-xs" :title="tx.txId">{{ tx.txId }}</td>
-                <td class="px-4 py-3">{{ tx.playerId }}</td>
-                <td class="px-4 py-3"><StatusBadge :status="tx.type === 'DEBIT' ? 'warning' : 'success'" :label="tx.type" /></td>
-                <td class="px-4 py-3 text-right font-mono">{{ formatMoney(tx.amountCents) }}</td>
-                <td class="px-4 py-3 text-right font-mono">{{ formatMoney(tx.balanceAfterCents) }}</td>
-              </tr>
-            </tbody>
-          </template>
-        </DataTable>
-
-        <DataTable title="审计日志" :loading="loadingOps" :empty="!opsSummary?.recentAuditEvents.length">
-          <template #default>
-            <thead class="bg-gray-50 text-left text-xs text-gray-500 dark:bg-dark-900 dark:text-gray-400">
-              <tr>
-                <th class="px-4 py-3">事件</th>
-                <th class="px-4 py-3">范围</th>
-                <th class="px-4 py-3">时间</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 text-sm dark:divide-dark-700">
-              <tr v-for="event in opsSummary?.recentAuditEvents" :key="`${event.id || event.createdAt}:${event.eventType}`">
-                <td class="px-4 py-3">
-                  <div class="font-medium text-gray-900 dark:text-white">{{ event.eventType }}</div>
-                  <div class="max-w-[360px] truncate font-mono text-xs text-gray-500">{{ JSON.stringify(event.payload) }}</div>
-                </td>
-                <td class="px-4 py-3 text-xs text-gray-500">{{ event.channelCode || '-' }} / {{ event.gameCode || '-' }} / {{ event.playerId || '-' }}</td>
-                <td class="px-4 py-3 text-xs text-gray-500">{{ formatDate(event.createdAt) }}</td>
-              </tr>
-            </tbody>
-          </template>
-        </DataTable>
-      </section>
-
-      <section class="card p-6">
-        <div class="flex items-start justify-between gap-4">
-          <div>
-            <h2 class="text-base font-semibold text-gray-900 dark:text-white">第二阶段入口</h2>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              风控、灰度、活动、租户结算和告警已经接入真实读写接口，所有操作会写入审计日志。
-            </p>
-          </div>
-          <button type="button" class="btn btn-secondary btn-sm" :disabled="loadingSecondStageSnapshot" @click="loadSecondStageSnapshot">
-            <Icon name="refresh" size="sm" />
-            {{ loadingSecondStageSnapshot ? t('common.loading') : '刷新模块' }}
-          </button>
-        </div>
-        <div class="mt-5 grid gap-4 xl:grid-cols-5">
-          <MetricCard label="风控规则" :value="secondStageSnapshot?.riskRules.length ?? 0" hint="可配置限额和处置动作" />
-          <MetricCard label="游戏分支" :value="secondStageSnapshot?.gameBranches.length ?? 0" hint="多版本和灰度比例" />
-          <MetricCard label="活动奖励" :value="secondStageSnapshot?.rewards.length ?? 0" hint="已发放钱包流水" />
-          <MetricCard label="租户结算" :value="secondStageSnapshot?.settlements.length ?? 0" hint="渠道周期报表" />
-          <MetricCard label="告警事件" :value="secondStageSnapshot?.alertEvents.length ?? 0" hint="可处置状态" />
-        </div>
-
-        <div class="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h3 class="font-medium text-gray-900 dark:text-white">风控策略</h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">限额规则、异常事件和人工处置。</p>
-              </div>
-              <StatusBadge status="success" label="mvp-ready" />
-            </div>
-            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
-              <div v-for="rule in secondStageSnapshot?.riskRules.slice(0, 3)" :key="rule.id" class="flex items-center justify-between gap-3">
-                <span class="truncate">{{ rule.name }}</span>
-                <span class="font-mono">{{ rule.thresholdCents ? formatMoney(rule.thresholdCents) : rule.thresholdCount || '-' }}</span>
-              </div>
-              <p v-if="!secondStageSnapshot?.riskRules.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoRiskRule">创建规则</button>
-              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="createDemoRiskEvent">触发事件</button>
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading || !firstOpenRiskEvent" @click="resolveFirstRiskEvent">处置事件</button>
-            </div>
-          </div>
-
-          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h3 class="font-medium text-gray-900 dark:text-white">分支与灰度</h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">管理游戏版本、发布计划和回滚目标。</p>
-              </div>
-              <StatusBadge status="success" label="mvp-ready" />
-            </div>
-            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
-              <div v-for="plan in secondStageSnapshot?.releasePlans.slice(0, 3)" :key="plan.id" class="flex items-center justify-between gap-3">
-                <span class="truncate">{{ plan.channelCode }} / {{ plan.targetVersion }}</span>
-                <span>{{ plan.rolloutPercent }}% / {{ plan.status }}</span>
-              </div>
-              <p v-if="!secondStageSnapshot?.releasePlans.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoBranch">创建分支</button>
-              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="createDemoReleasePlan">新建灰度</button>
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading || !firstDraftReleasePlan" @click="activateFirstReleasePlan">激活计划</button>
-            </div>
-          </div>
-
-          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h3 class="font-medium text-gray-900 dark:text-white">活动与奖励</h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">运营活动配置和奖励发放进入钱包流水。</p>
-              </div>
-              <StatusBadge status="success" label="mvp-ready" />
-            </div>
-            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
-              <div v-for="reward in secondStageSnapshot?.rewards.slice(0, 3)" :key="reward.id" class="flex items-center justify-between gap-3">
-                <span class="truncate">{{ reward.playerId }}</span>
-                <span class="font-mono">{{ formatMoney(reward.amountCents) }}</span>
-              </div>
-              <p v-if="!secondStageSnapshot?.rewards.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoCampaign">创建活动</button>
-              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="grantDemoReward">发放奖励</button>
-            </div>
-          </div>
-
-          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h3 class="font-medium text-gray-900 dark:text-white">代理与结算</h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">租户、渠道权限和周期结算报表。</p>
-              </div>
-              <StatusBadge status="success" label="mvp-ready" />
-            </div>
-            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
-              <div v-for="settlement in secondStageSnapshot?.settlements.slice(0, 3)" :key="settlement.id" class="flex items-center justify-between gap-3">
-                <span class="truncate">{{ settlement.tenantId }} / {{ settlement.period }}</span>
-                <span class="font-mono">{{ formatMoney(settlement.netCents) }}</span>
-              </div>
-              <p v-if="!secondStageSnapshot?.settlements.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoTenant">创建租户</button>
-              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="generateDemoSettlement">生成结算</button>
-            </div>
-          </div>
-
-          <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h3 class="font-medium text-gray-900 dark:text-white">告警与值班</h3>
-                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">健康状态、业务指标和人工处置记录。</p>
-              </div>
-              <StatusBadge status="success" label="mvp-ready" />
-            </div>
-            <div class="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
-              <div v-for="event in secondStageSnapshot?.alertEvents.slice(0, 3)" :key="event.id" class="flex items-center justify-between gap-3">
-                <span class="truncate">{{ event.message }}</span>
-                <span>{{ event.status }}</span>
-              </div>
-              <p v-if="!secondStageSnapshot?.alertEvents.length" class="text-gray-500 dark:text-gray-400">{{ t('common.noData') }}</p>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading" @click="createDemoAlertRule">创建规则</button>
-              <button type="button" class="btn btn-primary btn-sm" :disabled="secondStageActionLoading" @click="createDemoAlertEvent">触发告警</button>
-              <button type="button" class="btn btn-secondary btn-sm" :disabled="secondStageActionLoading || !firstOpenAlertEvent" @click="resolveFirstAlertEvent">处置告警</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-5">
-          <div class="text-xs font-medium text-gray-500 dark:text-gray-400">接口数据</div>
-          <div class="mt-2 flex flex-wrap gap-2 font-mono text-xs">
-            <button
-              v-for="module in opsSummary?.secondStage"
-              :key="module.key"
-              type="button"
-              class="rounded border border-gray-200 px-2 py-1 text-left transition hover:border-primary-400 hover:text-primary-600 dark:border-dark-700"
-              @click="loadSecondStageContract(module.key)"
-            >
-              /admin/ops/second-stage/{{ module.key }}
-            </button>
-          </div>
-        </div>
-        <div v-if="secondStageContract" class="mt-5 rounded-xl border border-gray-100 bg-gray-950 p-4 dark:border-dark-700">
-          <div class="mb-3 flex items-center justify-between">
-            <span class="text-xs font-medium uppercase text-gray-400">
-              {{ secondStageContract.module.title }} / {{ secondStageContract.status }}
-            </span>
-            <LoadingSpinner v-if="loadingSecondStage" size="sm" color="white" />
-          </div>
-          <pre class="max-h-96 overflow-auto whitespace-pre-wrap text-xs text-gray-100">{{ JSON.stringify(secondStageContract, null, 2) }}</pre>
-        </div>
-      </section>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import AppLayout from '@/components/layout/AppLayout.vue'
-import Icon from '@/components/icons/Icon.vue'
-import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
-import StatusBadge from '@/components/common/StatusBadge.vue'
-import { useAppStore } from '@/stores/app'
-import { extractApiErrorMessage } from '@/utils/apiError'
+import { computed, onMounted, reactive, ref } from 'vue'
 import gameServiceAPI, {
   type GameHealth,
-  type GameOpsSummary,
   type GameReady,
   type GameSession,
   type GmScenarioState,
   type ProtocolPayload,
-  type SecondStageContract,
-  type SecondStageSnapshot,
 } from '@/api/gameService'
+import { loadGameAdminSnapshot, type GameAdminSnapshot } from '@/api/gameAdmin'
+import AppLayout from '@/components/layout/AppLayout.vue'
+import Icon from '@/components/icons/Icon.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import StatusBadge from '@/components/common/StatusBadge.vue'
+import MetricCard from '@/components/admin/game/GameMetricCard.vue'
+import { useAppStore } from '@/stores/app'
+import { extractApiErrorMessage } from '@/utils/apiError'
 
-const { t } = useI18n()
 const appStore = useAppStore()
 
 const loadingStatus = ref(false)
-const loadingOps = ref(false)
-const exporting = ref(false)
 const creatingSession = ref(false)
 const loadingScenario = ref(false)
 const settingScenario = ref<string | null>(null)
 const protocolLoading = ref(false)
-const loadingSecondStageSnapshot = ref(false)
-const secondStageActionLoading = ref(false)
 
 const health = ref<GameHealth | null>(null)
 const ready = ref<GameReady | null>(null)
-const opsSummary = ref<GameOpsSummary | null>(null)
+const snapshot = ref<GameAdminSnapshot | null>(null)
 const session = ref<GameSession | null>(null)
 const scenarioState = ref<GmScenarioState | null>(null)
 const lastProtocol = ref<ProtocolPayload | null>(null)
-const secondStageContract = ref<SecondStageContract | null>(null)
-const loadingSecondStage = ref(false)
-const secondStageSnapshot = ref<SecondStageSnapshot | null>(null)
 
 const sessionForm = reactive({
   channelCode: 'demo',
@@ -511,63 +225,6 @@ const protocolOutput = computed(() => {
   return lastProtocol.value ? JSON.stringify(lastProtocol.value, null, 2) : '暂无协议响应'
 })
 
-const firstOpenRiskEvent = computed(() => {
-  return secondStageSnapshot.value?.riskEvents.find(event => event.status !== 'resolved') || null
-})
-
-const firstDraftReleasePlan = computed(() => {
-  return secondStageSnapshot.value?.releasePlans.find(plan => plan.status !== 'active') || null
-})
-
-const firstOpenAlertEvent = computed(() => {
-  return secondStageSnapshot.value?.alertEvents.find(event => event.status !== 'resolved') || null
-})
-
-const MetricCard = defineComponent({
-  props: {
-    label: { type: String, required: true },
-    value: { type: [String, Number], required: true },
-    hint: { type: String, required: true },
-  },
-  setup(props) {
-    return () => h('div', { class: 'rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800/60' }, [
-      h('div', { class: 'text-sm text-gray-500 dark:text-gray-400' }, props.label),
-      h('div', { class: 'mt-2 truncate text-2xl font-semibold text-gray-900 dark:text-white' }, String(props.value)),
-      h('div', { class: 'mt-1 text-xs text-gray-500 dark:text-gray-400' }, props.hint),
-    ])
-  },
-})
-
-const EmptyState = defineComponent({
-  props: {
-    text: { type: String, required: true },
-  },
-  setup(props) {
-    return () => h('div', { class: 'mt-5 rounded-xl border border-dashed border-gray-200 p-8 text-center text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400' }, props.text)
-  },
-})
-
-const DataTable = defineComponent({
-  props: {
-    title: { type: String, required: true },
-    loading: { type: Boolean, default: false },
-    empty: { type: Boolean, default: false },
-  },
-  setup(props, { slots }) {
-    return () => h('div', { class: 'card overflow-hidden' }, [
-      h('div', { class: 'flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700' }, [
-        h('h2', { class: 'text-base font-semibold text-gray-900 dark:text-white' }, props.title),
-        props.loading ? h(LoadingSpinner, { size: 'sm' }) : null,
-      ]),
-      props.empty
-        ? h('div', { class: 'p-8 text-center text-sm text-gray-500 dark:text-gray-400' }, '暂无数据')
-        : h('div', { class: 'overflow-x-auto' }, [
-            h('table', { class: 'min-w-full' }, slots.default?.()),
-          ]),
-    ])
-  },
-})
-
 function createRoundId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
   return `round-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -582,19 +239,11 @@ function requireSession(): GameSession {
   return session.value
 }
 
-function formatDate(value?: string): string {
-  if (!value) return t('common.notAvailable')
-  return new Intl.DateTimeFormat(undefined, {
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
     dateStyle: 'short',
     timeStyle: 'medium',
   }).format(new Date(value))
-}
-
-function formatMoney(cents: number): string {
-  return new Intl.NumberFormat(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100)
 }
 
 function handleError(error: unknown, fallback: string) {
@@ -604,12 +253,14 @@ function handleError(error: unknown, fallback: string) {
 async function loadStatus() {
   loadingStatus.value = true
   try {
-    const [healthResult, readyResult] = await Promise.all([
+    const [healthResult, readyResult, snapshotResult] = await Promise.allSettled([
       gameServiceAPI.getHealth(),
       gameServiceAPI.getReady(),
+      loadGameAdminSnapshot(),
     ])
-    health.value = healthResult
-    ready.value = readyResult
+    health.value = healthResult.status === 'fulfilled' ? healthResult.value : null
+    ready.value = readyResult.status === 'fulfilled' ? readyResult.value : null
+    snapshot.value = snapshotResult.status === 'fulfilled' ? snapshotResult.value : null
   } catch (error) {
     handleError(error, '游戏服务状态加载失败')
   } finally {
@@ -617,30 +268,8 @@ async function loadStatus() {
   }
 }
 
-async function loadOps() {
-  loadingOps.value = true
-  try {
-    opsSummary.value = await gameServiceAPI.getOpsSummary()
-  } catch (error) {
-    handleError(error, '运营数据加载失败')
-  } finally {
-    loadingOps.value = false
-  }
-}
-
-async function loadSecondStageSnapshot() {
-  loadingSecondStageSnapshot.value = true
-  try {
-    secondStageSnapshot.value = await gameServiceAPI.getSecondStageSnapshot()
-  } catch (error) {
-    handleError(error, '第二阶段模块加载失败')
-  } finally {
-    loadingSecondStageSnapshot.value = false
-  }
-}
-
-async function reloadAll() {
-  await Promise.all([loadStatus(), loadOps(), loadSecondStageSnapshot()])
+async function refreshSnapshot() {
+  snapshot.value = await loadGameAdminSnapshot()
 }
 
 async function startSession() {
@@ -655,7 +284,7 @@ async function startSession() {
       token: session.value.token,
       gameCode: session.value.gameCode,
     })
-    await loadOps()
+    await refreshSnapshot()
     appStore.showSuccess('测试会话已创建')
   } catch (error) {
     handleError(error, '测试会话创建失败')
@@ -690,7 +319,6 @@ async function chooseScenario(scenario: string) {
       },
       scenario,
     )
-    await loadOps()
     appStore.showSuccess('GM 场景已切换')
   } catch (error) {
     handleError(error, 'GM 场景切换失败')
@@ -707,7 +335,7 @@ async function runInit() {
       token: current.token,
       gameCode: current.gameCode,
     })
-    await loadOps()
+    await refreshSnapshot()
   } catch (error) {
     handleError(error, '协议动作执行失败')
   } finally {
@@ -727,7 +355,7 @@ async function runSpin() {
       roundId: spinForm.roundId,
     })
     if (lastProtocol.value.na !== 'c') resetRoundId()
-    await loadOps()
+    await refreshSnapshot()
   } catch (error) {
     handleError(error, '协议动作执行失败')
   } finally {
@@ -744,7 +372,7 @@ async function runCollect() {
       gameCode: current.gameCode,
     })
     resetRoundId()
-    await loadOps()
+    await refreshSnapshot()
   } catch (error) {
     handleError(error, '协议动作执行失败')
   } finally {
@@ -752,175 +380,7 @@ async function runCollect() {
   }
 }
 
-async function downloadOpsCsv() {
-  exporting.value = true
-  try {
-    const blob = await gameServiceAPI.exportOpsCsv()
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `game-ops-${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  } catch (error) {
-    handleError(error, '运营报表导出失败')
-  } finally {
-    exporting.value = false
-  }
-}
-
-async function loadSecondStageContract(endpoint: string) {
-  loadingSecondStage.value = true
-  try {
-    secondStageContract.value = await gameServiceAPI.getSecondStageContract(endpoint)
-  } catch (error) {
-    handleError(error, '第二阶段接口加载失败')
-  } finally {
-    loadingSecondStage.value = false
-  }
-}
-
-async function runSecondStageAction(message: string, action: () => Promise<unknown>) {
-  secondStageActionLoading.value = true
-  try {
-    await action()
-    await Promise.all([loadOps(), loadSecondStageSnapshot()])
-    appStore.showSuccess(message)
-  } catch (error) {
-    handleError(error, '第二阶段操作失败')
-  } finally {
-    secondStageActionLoading.value = false
-  }
-}
-
-async function createDemoRiskRule() {
-  await runSecondStageAction('风控规则已保存', () => gameServiceAPI.createRiskRule({
-    id: `manual-limit-${Date.now()}`,
-    name: '人工单局限额',
-    scope: 'channel/game/player',
-    metric: 'stakeCents',
-    thresholdCents: 300000,
-    action: 'review',
-    enabled: true,
-  }))
-}
-
-async function createDemoRiskEvent() {
-  await runSecondStageAction('风控事件已创建', () => gameServiceAPI.createRiskEvent({
-    ruleId: secondStageSnapshot.value?.riskRules[0]?.id || 'max-single-bet',
-    severity: 'warning',
-    channelCode: session.value?.channelCode || sessionForm.channelCode,
-    gameCode: session.value?.gameCode || sessionForm.gameCode,
-    playerId: session.value?.playerId || sessionForm.playerId,
-    message: '后台人工触发风控复核',
-    payload: { source: 'admin-demo' },
-  }))
-}
-
-async function resolveFirstRiskEvent() {
-  const event = firstOpenRiskEvent.value
-  if (!event) return
-  await runSecondStageAction('风控事件已处置', () => gameServiceAPI.resolveRiskEvent(event.id))
-}
-
-async function createDemoBranch() {
-  await runSecondStageAction('游戏分支已保存', () => gameServiceAPI.createGameBranch({
-    gameCode: sessionForm.gameCode,
-    version: `mvp-${Date.now()}`,
-    status: 'enabled',
-    rolloutPercent: 25,
-    config: { source: 'client/vs10jokerhot' },
-  }))
-}
-
-async function createDemoReleasePlan() {
-  await runSecondStageAction('灰度计划已创建', () => gameServiceAPI.createReleasePlan({
-    channelCode: sessionForm.channelCode,
-    gameCode: sessionForm.gameCode,
-    targetVersion: secondStageSnapshot.value?.gameBranches[0]?.version || 'mvp',
-    rolloutPercent: 25,
-    rollbackVersion: 'mvp',
-    status: 'draft',
-  }))
-}
-
-async function activateFirstReleasePlan() {
-  const plan = firstDraftReleasePlan.value
-  if (!plan) return
-  await runSecondStageAction('灰度计划已激活', () => gameServiceAPI.updateReleasePlan(plan.id, 'active'))
-}
-
-async function createDemoCampaign() {
-  await runSecondStageAction('活动已保存', () => gameServiceAPI.createCampaign({
-    id: `manual-reward-${Date.now()}`,
-    name: '人工奖励活动',
-    type: 'manual-reward',
-    status: 'active',
-    budgetCents: 500000,
-    config: { rewardCents: 1000 },
-  }))
-}
-
-async function grantDemoReward() {
-  await runSecondStageAction('奖励已发放', () => gameServiceAPI.grantReward({
-    campaignId: secondStageSnapshot.value?.campaigns[0]?.id || 'daily-spin-reward',
-    channelCode: session.value?.channelCode || sessionForm.channelCode,
-    gameCode: session.value?.gameCode || sessionForm.gameCode,
-    playerId: session.value?.playerId || sessionForm.playerId,
-    currency: session.value?.currency || sessionForm.currency,
-    amountCents: 1000,
-    payload: { source: 'admin-demo' },
-  }))
-}
-
-async function createDemoTenant() {
-  await runSecondStageAction('租户已保存', () => gameServiceAPI.createTenant({
-    id: `operator-${Date.now()}`,
-    name: 'Demo 新代理',
-    status: 'active',
-    channelCodes: [sessionForm.channelCode],
-    permissions: ['players:read', 'rounds:read', 'reports:export'],
-  }))
-}
-
-async function generateDemoSettlement() {
-  await runSecondStageAction('结算报表已生成', () => gameServiceAPI.generateSettlement({
-    tenantId: secondStageSnapshot.value?.tenants[0]?.id || 'operator-demo',
-    channelCode: sessionForm.channelCode,
-    period: new Date().toISOString().slice(0, 10),
-  }))
-}
-
-async function createDemoAlertRule() {
-  await runSecondStageAction('告警规则已保存', () => gameServiceAPI.createAlertRule({
-    id: `manual-alert-${Date.now()}`,
-    name: '人工值班告警',
-    source: '/admin/ops/summary',
-    severity: 'warning',
-    condition: 'manual=true',
-    enabled: true,
-  }))
-}
-
-async function createDemoAlertEvent() {
-  await runSecondStageAction('告警事件已创建', () => gameServiceAPI.createAlertEvent({
-    ruleId: secondStageSnapshot.value?.alertRules[0]?.id || 'negative-platform-net',
-    source: '/admin/ops/summary',
-    severity: 'warning',
-    message: '后台人工触发值班告警',
-    payload: { source: 'admin-demo' },
-  }))
-}
-
-async function resolveFirstAlertEvent() {
-  const event = firstOpenAlertEvent.value
-  if (!event) return
-  await runSecondStageAction('告警事件已处置', () => gameServiceAPI.resolveAlertEvent(event.id))
-}
-
 onMounted(() => {
-  void reloadAll()
+  void loadStatus()
 })
 </script>
