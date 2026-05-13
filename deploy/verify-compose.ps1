@@ -63,7 +63,9 @@ try {
 
 $yaml = $rendered -join "`n"
 
-Assert-True ($yaml -match "image:\s*pragmaticplay-admin:local") "admin image must be built from local source"
+Assert-True ($yaml -match "admin-web:") "admin compose must expose admin-web service"
+Assert-True ($yaml -match "container_name:\s*pragmaticplay-admin-web") "admin web container must use pragmaticplay-admin-web"
+Assert-True ($yaml -match "image:\s*pragmaticplay-admin-web:local") "admin image must be built from local source"
 Assert-True ($yaml -match "context:\s*$([regex]::Escape($repoRoot))") "admin build context must point to repository root"
 Assert-True ($yaml -match "VITE_GAME_SERVICE_BASE_URL") "game service frontend build arg is required"
 Assert-True ($yaml -match "published:\s*""?$([regex]::Escape($expectedServerPort))""?") "admin host port should match SERVER_PORT=$expectedServerPort"

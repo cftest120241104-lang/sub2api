@@ -151,7 +151,7 @@ main() {
     echo "     docker compose -f docker-compose.local.yml up -d --build"
     echo ""
     echo "  4. View logs:"
-    echo "     docker compose -f docker-compose.local.yml logs -f sub2api"
+    echo "     docker compose -f docker-compose.local.yml logs -f admin-web"
     echo ""
     echo "  5. Access Web UI:"
     echo "     http://localhost:8090"
