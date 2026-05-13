@@ -116,7 +116,7 @@ const navItems: NavItem[] = [
   { path: '/admin/game-service', label: '游戏服务调试', icon: 'server' },
   { path: '/admin/announcements', label: '公告管理', icon: 'bell' },
   { path: '/admin/users', label: '管理员用户', icon: 'userCircle' },
-  { path: '/admin/settings', label: '系统设置', icon: 'cog' },
+  { path: '/admin/settings', label: '上线设置', icon: 'cog' },
 ]
 
 function toggleSidebar() {

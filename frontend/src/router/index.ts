@@ -165,11 +165,11 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/settings',
     name: 'AdminSettings',
-    component: () => import('@/views/admin/SettingsView.vue'),
+    component: () => import('@/views/admin/GameAdminSettingsView.vue'),
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: '系统设置'
+      title: '上线设置'
     }
   },
   {
