@@ -1,6 +1,6 @@
 # 游戏后台适配说明
 
-`admin` 以 `Wei-Shaw/sub2api` 为底层保留原有 Go + Vue + PostgreSQL + Redis 管理能力，并在前端增加“游戏服务”入口，用来对接当前仓库的 `server`。
+`admin` 已从通用管理底座收敛为本项目的游戏运营后台。当前阶段保留 Go + Vue + PostgreSQL + Redis 运行结构，前端只暴露游戏运营相关入口，并通过“游戏服务”模块对接当前仓库的 `server`。
 
 ## 当前适配范围
 
@@ -26,9 +26,15 @@ VITE_GAME_SERVICE_BASE_URL=http://127.0.0.1:3100
 CORS_ORIGINS=https://game.example.com,https://admin.example.com
 ```
 
+## 协议统一约定
+
+- `server` 业务层只使用 `nextStep`、`winCents`、`totalWinCents`、`symbols`、`symbolsAbove`、`symbolsBelow` 等语义化字段。
+- Pragmatic 外部协议短字段 `na`、`w`、`tw`、`s`、`sa`、`sb` 只允许出现在协议边界适配层，用于兼容原客户端和第三方接入。
+- 客户端 Spin 解析优先读取语义化字段，缺失时回退短字段，避免二开代码继续传播不明语义变量。
+
 ## 后续改造方向
 
-- 将游戏服务配置持久化到 sub2api 后端，由管理员在系统设置中维护。
+- 将游戏服务配置持久化到后台后端，由管理员在系统设置中维护。
 - 增加 `server` 侧的后台专用只读/操作 API，避免长期依赖浏览器直连。
 - 把玩家会话、局记录、审计事件做成后台列表页。
 - 多游戏分支接入后，增加游戏目录、版本和发布状态管理。

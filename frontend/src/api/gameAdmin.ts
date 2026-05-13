@@ -142,9 +142,9 @@ const CONFIG_STORAGE_KEY = 'game_admin_channel_game_configs_v1'
 
 const mockChannels: GameAdminChannel[] = [
   {
-    code: 'demo',
-    name: 'Demo 直营网关',
-    operator: '自营测试渠道',
+    code: 'platform',
+    name: 'Platform Direct',
+    operator: '平台直营网关',
     region: 'Global',
     currency: 'USD',
     status: 'enabled',

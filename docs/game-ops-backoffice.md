@@ -1,6 +1,6 @@
 # 游戏运营后台功能范围
 
-本文档定义 `admin` 基于 sub2api 底座改造后的游戏运营后台范围。后台入口为 `/admin/game-service`，直连 `pragmaticplay_games/server`。
+本文档定义 `admin` 游戏运营后台范围。后台入口为 `/admin/game-service`，直连 `pragmaticplay_games/server`。
 
 ## MVP
 
