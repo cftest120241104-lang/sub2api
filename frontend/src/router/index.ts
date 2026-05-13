@@ -112,6 +112,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/rtp-control',
+    name: 'AdminRtpControl',
+    component: () => import('@/views/admin/RtpControlView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'RTP 与棋盘控制'
+    }
+  },
+  {
     path: '/admin/players',
     name: 'AdminPlayerSessions',
     component: () => import('@/views/admin/PlayerSessionsView.vue'),

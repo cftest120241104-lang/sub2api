@@ -324,6 +324,90 @@ export interface GameScenarioDefinition extends GameScenario {
   enabled: boolean
 }
 
+export interface GameReelScreen {
+  rows: number
+  columns: number
+  symbols: number[]
+  symbolsAbove: number[]
+  symbolsBelow: number[]
+}
+
+export interface GameBoardConfig {
+  gameCode: string
+  boardId: string
+  label: string
+  description: string
+  screen: GameReelScreen
+  tags: string[]
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RtpProfile {
+  profileId: string
+  label: string
+  description: string
+  targetRtpPermille: number
+  tolerancePermille: number
+  enabled: boolean
+  config: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RtpScenarioWeight {
+  scenarioId: string
+  weight: number
+  minRtpGapPermille?: number
+  maxRtpGapPermille?: number
+}
+
+export interface RtpRule {
+  ruleId: string
+  label: string
+  priority: number
+  channelCode?: string
+  gameCode?: string
+  currency?: string
+  playerSegment: string
+  minBetCents?: number
+  maxBetCents?: number
+  activeFrom?: string
+  activeUntil?: string
+  profileId?: string
+  targetRtpPermille?: number
+  tolerancePermille?: number
+  scenarioWeights: RtpScenarioWeight[]
+  conditions: Record<string, unknown>
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RtpRuntimeStats {
+  channelCode: string
+  gameCode: string
+  profileId: string
+  ruleId: string
+  playerSegment: string
+  currency: string
+  bucketKey: string
+  rounds: number
+  totalBetCents: number
+  totalWinCents: number
+  actualRtpPermille: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RtpControlOverview {
+  profiles: RtpProfile[]
+  rules: RtpRule[]
+  boardConfigs: GameBoardConfig[]
+  runtimeStats: RtpRuntimeStats[]
+}
+
 export interface OpsChannelCatalogItem {
   code: string
   name: string
@@ -527,6 +611,47 @@ export async function saveScenarioConfig(gameCode: string, payload: Partial<Game
   return data
 }
 
+export async function getRtpControlOverview(): Promise<RtpControlOverview> {
+  const { data } = await gameServiceClient.get<RtpControlOverview>('/admin/ops/rtp-control')
+  return data
+}
+
+export async function getBoardConfigs(gameCode?: string): Promise<GameBoardConfig[]> {
+  const path = gameCode ? `/admin/ops/games/${gameCode}/board-configs` : '/admin/ops/board-configs'
+  const { data } = await gameServiceClient.get<GameBoardConfig[]>(path)
+  return data
+}
+
+export async function saveBoardConfig(payload: Partial<GameBoardConfig>): Promise<GameBoardConfig> {
+  const { data } = await gameServiceClient.post<GameBoardConfig>('/admin/ops/board-configs', payload)
+  return data
+}
+
+export async function getRtpProfiles(): Promise<RtpProfile[]> {
+  const { data } = await gameServiceClient.get<RtpProfile[]>('/admin/ops/rtp-profiles')
+  return data
+}
+
+export async function saveRtpProfile(payload: Partial<RtpProfile>): Promise<RtpProfile> {
+  const { data } = await gameServiceClient.post<RtpProfile>('/admin/ops/rtp-profiles', payload)
+  return data
+}
+
+export async function getRtpRules(): Promise<RtpRule[]> {
+  const { data } = await gameServiceClient.get<RtpRule[]>('/admin/ops/rtp-rules')
+  return data
+}
+
+export async function saveRtpRule(payload: Partial<RtpRule>): Promise<RtpRule> {
+  const { data } = await gameServiceClient.post<RtpRule>('/admin/ops/rtp-rules', payload)
+  return data
+}
+
+export async function getRtpRuntimeStats(): Promise<RtpRuntimeStats[]> {
+  const { data } = await gameServiceClient.get<RtpRuntimeStats[]>('/admin/ops/rtp-runtime-stats')
+  return data
+}
+
 export async function getSecondStageModules(): Promise<SecondStageModule[]> {
   const { data } = await gameServiceClient.get<SecondStageModule[]>('/admin/ops/second-stage')
   return data
@@ -672,6 +797,14 @@ export const gameServiceAPI = {
   saveChannelGameConfig,
   getScenarioConfigs,
   saveScenarioConfig,
+  getRtpControlOverview,
+  getBoardConfigs,
+  saveBoardConfig,
+  getRtpProfiles,
+  saveRtpProfile,
+  getRtpRules,
+  saveRtpRule,
+  getRtpRuntimeStats,
   getSecondStageModules,
   getSecondStageContract,
   getSecondStageSnapshot,
