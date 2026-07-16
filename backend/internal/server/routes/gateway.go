@@ -62,10 +62,17 @@ func RegisterGatewayRoutes(
 	}
 	imagesHandler := func(c *gin.Context) {
 		switch getGroupPlatform(c) {
-		case service.PlatformOpenAI:
+		case service.PlatformOpenAI, service.PlatformGrok:
+			// Scheme B: sync Images API surface, internal async task + optional R2 offload.
+			if h.AsyncImage != nil && h.AsyncImage.ShouldSyncViaAsync() {
+				h.AsyncImage.SubmitAndWait(c)
+				return
+			}
+			if getGroupPlatform(c) == service.PlatformGrok {
+				h.OpenAIGateway.GrokImages(c)
+				return
+			}
 			h.OpenAIGateway.Images(c)
-		case service.PlatformGrok:
-			h.OpenAIGateway.GrokImages(c)
 		default:
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
 			c.JSON(http.StatusNotFound, gin.H{
