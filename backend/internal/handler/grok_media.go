@@ -494,6 +494,7 @@ func recordGrokMediaUsage(
 			RequestPayloadHash: service.HashUsageRequestPayload(payloadForHash),
 			APIKeyService:      h.apiKeyService,
 			QuotaPlatform:      quotaPlatform,
+			AsyncImageTask:     isAsyncImageTaskContext(c),
 			ChannelUsageFields: channelUsageFields,
 		}); err != nil {
 			logger.L().With(
