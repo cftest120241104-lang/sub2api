@@ -326,6 +326,7 @@ export default {
     ws: 'WS',
     stream: '流式',
     sync: '同步',
+    async: '异步',
     cyber: '安全策略',
     live: 'Live',
     unknown: '未知',

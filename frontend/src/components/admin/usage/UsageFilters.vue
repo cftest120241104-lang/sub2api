@@ -270,6 +270,7 @@ const requestTypeOptions = ref<SelectOption[]>([
   { value: 'ws_v2', label: t('usage.ws') },
   { value: 'live', label: t('usage.live') },
   { value: 'stream', label: t('usage.stream') },
+  { value: 'async', label: t('usage.async') },
   { value: 'sync', label: t('usage.sync') },
   { value: 'cyber', label: t('usage.cyber') }
 ])

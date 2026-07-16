@@ -321,6 +321,7 @@ export default {
     ws: 'WS',
     stream: 'Stream',
     sync: 'Sync',
+    async: 'Async',
     cyber: 'Cyber',
     live: 'Live',
     unknown: 'Unknown',

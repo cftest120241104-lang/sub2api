@@ -112,7 +112,12 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	}
 
 	setOpsRequestContext(c, clientRequestModel, parsed.Stream)
-	setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(parsed.Stream, false)))
+	requestType := int16(service.RequestTypeFromLegacy(parsed.Stream, false))
+	if isAsyncImageTaskContext(c) {
+		// Client /async or sync-via-async pipeline: label usage as async.
+		requestType = int16(service.RequestTypeAsync)
+	}
+	setOpsEndpointContext(c, "", requestType)
 
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, routingModel)
 
