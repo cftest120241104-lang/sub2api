@@ -511,7 +511,11 @@ func recordGrokMediaUsage(
 			RequestPayloadHash: service.HashUsageRequestPayload(payloadForHash),
 			APIKeyService:      h.apiKeyService,
 			QuotaPlatform:      quotaPlatform,
+<<<<<<< HEAD
 			SessionID:          sessionID,
+=======
+			AsyncImageTask:     isAsyncImageTaskContext(c),
+>>>>>>> 4de25de63 (fix: Grok images 用量也标记 async 任务)
 			ChannelUsageFields: channelUsageFields,
 		}); err != nil {
 			logger.L().With(
