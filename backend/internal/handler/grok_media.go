@@ -112,7 +112,11 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 
 	reqLog = reqLog.With(zap.String("model", requestModel))
 	setOpsRequestContext(c, requestModel, false)
-	setOpsEndpointContext(c, "", int16(service.RequestTypeSync))
+	requestType := int16(service.RequestTypeSync)
+	if isAsyncImageTaskContext(c) {
+		requestType = int16(service.RequestTypeAsync)
+	}
+	setOpsEndpointContext(c, "", requestType)
 
 	if endpoint.IsGenerationRequest() {
 		if !service.GroupAllowsImageGeneration(apiKey.Group) {

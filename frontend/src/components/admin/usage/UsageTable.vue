@@ -585,6 +585,7 @@ const getRequestTypeLabel = (row: AdminUsageLog): string => {
   if (requestType === 'cyber') return t('usage.cyber')
   if (requestType === 'ws_v2') return t('usage.ws')
   if (requestType === 'stream') return t('usage.stream')
+  if (requestType === 'async') return t('usage.async')
   if (requestType === 'sync') return t('usage.sync')
   return t('usage.unknown')
 }
@@ -594,6 +595,7 @@ const getRequestTypeBadgeClass = (row: AdminUsageLog): string => {
   if (requestType === 'cyber') return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
   if (requestType === 'ws_v2') return 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200'
   if (requestType === 'stream') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+  if (requestType === 'async') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
   if (requestType === 'sync') return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
   return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
 }

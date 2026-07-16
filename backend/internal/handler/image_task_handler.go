@@ -410,7 +410,23 @@ func newAsyncImageContext(c *gin.Context, body []byte, timeoutDuration time.Dura
 	recorderCtx, _ := gin.CreateTestContext(recorder)
 	taskCtx.Writer = recorderCtx.Writer
 	taskCtx.Request = request
+	// Mark so usage_logs.request_type is recorded as async (not plain sync).
+	taskCtx.Set(asyncImageTaskContextKey, true)
 	return taskCtx, recorder, cancel
+}
+
+const asyncImageTaskContextKey = "sub2api_async_image_task"
+
+func isAsyncImageTaskContext(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	v, ok := c.Get(asyncImageTaskContextKey)
+	if !ok {
+		return false
+	}
+	flag, _ := v.(bool)
+	return flag
 }
 
 func asyncImageRequestStreams(contentType string, body []byte) bool {

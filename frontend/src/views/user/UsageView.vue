@@ -377,6 +377,7 @@ const requestTypeOptions = computed<SelectOption[]>(() => [
   { value: null, label: t('admin.usage.allTypes') },
   { value: 'ws_v2', label: t('usage.ws') },
   { value: 'stream', label: t('usage.stream') },
+  { value: 'async', label: t('usage.async') },
   { value: 'sync', label: t('usage.sync') },
 ])
 const billingTypeOptions = computed<SelectOption[]>(() => [
@@ -597,6 +598,7 @@ const getRequestTypeExportText = (log: UsageLog): string => {
   if (requestType === 'cyber') return 'Cyber'
   if (requestType === 'ws_v2') return 'WS'
   if (requestType === 'stream') return 'Stream'
+  if (requestType === 'async') return 'Async'
   if (requestType === 'sync') return 'Sync'
   return 'Unknown'
 }
