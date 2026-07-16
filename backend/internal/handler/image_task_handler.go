@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -23,13 +24,23 @@ import (
 type AsyncImageHandler struct {
 	tasks   *service.ImageTaskService
 	openAI  *OpenAIGatewayHandler
+	cfg     *config.Config
 	execute func(platform string, c *gin.Context)
 }
 
-func NewAsyncImageHandler(tasks *service.ImageTaskService, openAI *OpenAIGatewayHandler) *AsyncImageHandler {
-	h := &AsyncImageHandler{tasks: tasks, openAI: openAI}
+func NewAsyncImageHandler(tasks *service.ImageTaskService, openAI *OpenAIGatewayHandler, cfg *config.Config) *AsyncImageHandler {
+	h := &AsyncImageHandler{tasks: tasks, openAI: openAI, cfg: cfg}
 	h.execute = h.executeWithGateway
 	return h
+}
+
+// ShouldSyncViaAsync reports whether sync Images endpoints should wait on the
+// async task pipeline (task store + optional R2 offload) before responding.
+func (h *AsyncImageHandler) ShouldSyncViaAsync() bool {
+	if h == nil || !h.enabled() || h.cfg == nil {
+		return false
+	}
+	return h.cfg.Gateway.ImagesSyncViaAsync
 }
 
 // enabled reports whether the async image task feature is available. Object
@@ -159,6 +170,131 @@ func (h *AsyncImageHandler) checkSecurityAuditBeforeSubmit(c *gin.Context, apiKe
 		return false
 	}
 	return true
+}
+
+// SubmitAndWait runs the same async task pipeline as Submit, but blocks the
+// caller's HTTP request until the task finishes, then returns the final Images
+// JSON (after optional R2 offload). Used so Codex built-in imagegen can keep
+// its sync contract and placeholder UI while reusing async task storage.
+func (h *AsyncImageHandler) SubmitAndWait(c *gin.Context) {
+	if !h.enabled() {
+		// Async pipeline unavailable: fall back to direct sync gateway.
+		if h.openAI != nil {
+			h.openAI.Images(c)
+			return
+		}
+		imageTaskJSONError(c, http.StatusServiceUnavailable, "api_error", "image gateway is unavailable")
+		return
+	}
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
+	if !ok || apiKey == nil || apiKey.UserID <= 0 || apiKey.ID <= 0 {
+		imageTaskError(c, service.ErrImageTaskForbidden)
+		return
+	}
+	platform := ""
+	if apiKey.Group != nil {
+		platform = apiKey.Group.Platform
+	}
+	if platform != service.PlatformOpenAI && platform != service.PlatformGrok {
+		imageTaskJSONError(c, http.StatusNotFound, "not_found_error", "Images API is not supported for this platform")
+		return
+	}
+	if !service.GroupAllowsImageGeneration(apiKey.Group) {
+		imageTaskJSONError(c, http.StatusForbidden, "permission_error", service.ImageGenerationPermissionMessage())
+		return
+	}
+	if h.execute == nil {
+		imageTaskError(c, service.ErrImageTaskUnavailable)
+		return
+	}
+
+	body, err := pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
+	if err != nil {
+		if maxErr, ok := extractMaxBytesError(err); ok {
+			imageTaskJSONError(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
+			return
+		}
+		imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
+		return
+	}
+	if len(body) == 0 {
+		imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
+		return
+	}
+	if asyncImageRequestStreams(c.GetHeader("Content-Type"), body) {
+		// Streaming clients stay on the direct path (async tasks reject stream).
+		if platform == service.PlatformGrok {
+			h.openAI.GrokImages(c)
+			return
+		}
+		h.openAI.Images(c)
+		return
+	}
+	if err := h.validateRequest(c, platform, body); err != nil {
+		imageTaskJSONError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return
+	}
+	if !h.checkSecurityAuditBeforeSubmit(c, apiKey, platform, body) {
+		return
+	}
+
+	// Keep the client connection warm while the worker generates (Codex long wait).
+	stopKeepalive := service.StartOpenAIImagesJSONKeepalive(c, h.nonstreamKeepaliveInterval())
+	defer stopKeepalive()
+
+	taskCtx, recorder, cancel := newAsyncImageContext(c, body, h.tasks.ExecutionTimeout())
+	task, err := h.tasks.Create(c.Request.Context(), service.ImageTaskOwner{UserID: apiKey.UserID, APIKeyID: apiKey.ID})
+	if err != nil {
+		cancel()
+		imageTaskError(c, err)
+		return
+	}
+	logger.L().Info("image_task.sync_via_async_start",
+		zap.String("task_id", task.ID),
+		zap.String("platform", platform),
+		zap.String("path", c.Request.URL.Path),
+	)
+
+	// Run worker inline (same pipeline as async Submit's background run).
+	h.run(task.ID, platform, taskCtx, recorder, cancel)
+
+	public, err := h.tasks.Get(c.Request.Context(), service.ImageTaskOwner{UserID: apiKey.UserID, APIKeyID: apiKey.ID}, task.ID)
+	if err != nil {
+		imageTaskError(c, err)
+		return
+	}
+	// Prefer rewritten R2 result from task store; fall back to recorder body.
+	if public.Status == service.ImageTaskStatusCompleted && len(public.Result) > 0 {
+		c.Header("Cache-Control", "no-store")
+		c.Header("X-Sub2API-Image-Mode", "sync-via-async")
+		c.Header("X-Sub2API-Image-Task-Id", public.ID)
+		c.Data(http.StatusOK, "application/json; charset=utf-8", public.Result)
+		return
+	}
+	if public.Status == service.ImageTaskStatusFailed {
+		status := public.HTTPStatus
+		if status < http.StatusBadRequest {
+			status = http.StatusBadGateway
+		}
+		c.Header("Cache-Control", "no-store")
+		c.Header("X-Sub2API-Image-Mode", "sync-via-async")
+		c.Header("X-Sub2API-Image-Task-Id", public.ID)
+		if len(public.Error) > 0 && json.Valid(public.Error) {
+			c.Data(status, "application/json; charset=utf-8", []byte(`{"error":`+string(public.Error)+`}`))
+			return
+		}
+		imageTaskJSONError(c, status, "api_error", "image generation failed")
+		return
+	}
+	// Still processing after run() returned — treat as timeout/unavailable.
+	imageTaskJSONError(c, http.StatusGatewayTimeout, "timeout_error", "image generation did not complete")
+}
+
+func (h *AsyncImageHandler) nonstreamKeepaliveInterval() time.Duration {
+	if h == nil || h.cfg == nil || h.cfg.Gateway.ImageNonstreamKeepaliveInterval <= 0 {
+		return 0
+	}
+	return time.Duration(h.cfg.Gateway.ImageNonstreamKeepaliveInterval) * time.Second
 }
 
 func (h *AsyncImageHandler) Get(c *gin.Context) {

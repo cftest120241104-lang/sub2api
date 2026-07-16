@@ -983,6 +983,10 @@ type GatewayConfig struct {
 	ImageStreamKeepaliveInterval int `mapstructure:"image_stream_keepalive_interval"`
 	// ImageNonstreamKeepaliveInterval: 图片非流式 JSON keepalive 间隔（秒），0表示禁用
 	ImageNonstreamKeepaliveInterval int `mapstructure:"image_nonstream_keepalive_interval"`
+	// ImagesSyncViaAsync: 同步 /images/generations|edits 入口在内部走异步任务（worker + 可选 R2 转存），
+	// 阻塞等待完成后以同步 JSON 响应返回。便于 Codex 内置 imagegen 保持占位 UI，同时复用 async 管线。
+	// 需 image_storage 启用；关闭时保持上游直连行为。默认 false 以兼容官方行为。
+	ImagesSyncViaAsync bool `mapstructure:"images_sync_via_async"`
 	// MaxLineSize: 上游 SSE 单行最大字节数（0使用默认值）
 	MaxLineSize int `mapstructure:"max_line_size"`
 
@@ -2335,6 +2339,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.image_stream_data_interval_timeout", 900)
 	viper.SetDefault("gateway.image_stream_keepalive_interval", 10)
 	viper.SetDefault("gateway.image_nonstream_keepalive_interval", 0)
+	viper.SetDefault("gateway.images_sync_via_async", false)
 	viper.SetDefault("gateway.max_line_size", 500*1024*1024)
 	viper.SetDefault("gateway.scheduling.sticky_session_max_waiting", 3)
 	viper.SetDefault("gateway.scheduling.sticky_session_wait_timeout", 120*time.Second)
