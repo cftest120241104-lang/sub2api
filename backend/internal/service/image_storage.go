@@ -57,6 +57,80 @@ func defaultImageDownloadHTTPClient() *http.Client {
 	return &http.Client{Timeout: 60 * time.Second}
 }
 
+// EnsureImageResultHasB64JSON makes sure each data[] item has b64_json.
+// Codex Desktop imagegen requires b64_json and rejects URL-only payloads.
+// Used by sync-via-async when the task store only has R2 urls after offload.
+func EnsureImageResultHasB64JSON(ctx context.Context, result json.RawMessage) (json.RawMessage, error) {
+	if len(result) == 0 || !json.Valid(result) {
+		return result, fmt.Errorf("invalid image result json")
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(result, &top); err != nil {
+		return nil, err
+	}
+	rawData, ok := top["data"]
+	if !ok {
+		return result, nil
+	}
+	var items []map[string]json.RawMessage
+	if err := json.Unmarshal(rawData, &items); err != nil {
+		return nil, err
+	}
+	client := defaultImageDownloadHTTPClient()
+	changed := false
+	for i, item := range items {
+		if raw, ok := item["b64_json"]; ok {
+			var b64 string
+			if json.Unmarshal(raw, &b64) == nil && strings.TrimSpace(b64) != "" {
+				continue
+			}
+		}
+		var url string
+		if raw, ok := item["url"]; ok {
+			_ = json.Unmarshal(raw, &url)
+		}
+		url = strings.TrimSpace(url)
+		if url == "" {
+			return nil, fmt.Errorf("image %d: missing b64_json and url", i)
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, fmt.Errorf("image %d: build download request: %w", i, err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("image %d: download: %w", i, err)
+		}
+		data, readErr := io.ReadAll(io.LimitReader(resp.Body, defaultImageMaxDownloadBytes+1))
+		_ = resp.Body.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("image %d: read body: %w", i, readErr)
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("image %d: download status %d", i, resp.StatusCode)
+		}
+		if int64(len(data)) > defaultImageMaxDownloadBytes {
+			return nil, fmt.Errorf("image %d: download exceeds limit", i)
+		}
+		b64Raw, err := json.Marshal(base64.StdEncoding.EncodeToString(data))
+		if err != nil {
+			return nil, err
+		}
+		item["b64_json"] = b64Raw
+		items[i] = item
+		changed = true
+	}
+	if !changed {
+		return result, nil
+	}
+	newData, err := json.Marshal(items)
+	if err != nil {
+		return nil, err
+	}
+	top["data"] = newData
+	return json.Marshal(top)
+}
+
 // Rewrite 将 result（上游生图响应 JSON）里的每张图片转存到对象存储，
 // 返回改写后的紧凑结果（data[i].url 指向对象存储，b64_json 被移除）。
 // 任一图片转存失败即返回 error（调用方据此将任务标记为失败，绝不把大 blob 落 Redis）。
