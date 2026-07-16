@@ -256,6 +256,8 @@ func (h *AsyncImageHandler) SubmitAndWait(c *gin.Context) {
 	)
 
 	// Run worker inline (same pipeline as async Submit's background run).
+	// run() stores an R2-rewritten copy in Redis for poll clients, but the
+	// httptest recorder still holds the original upstream JSON (with b64_json).
 	h.run(task.ID, platform, taskCtx, recorder, cancel)
 
 	public, err := h.tasks.Get(c.Request.Context(), service.ImageTaskOwner{UserID: apiKey.UserID, APIKeyID: apiKey.ID}, task.ID)
@@ -263,22 +265,44 @@ func (h *AsyncImageHandler) SubmitAndWait(c *gin.Context) {
 		imageTaskError(c, err)
 		return
 	}
-	// Prefer rewritten R2 result from task store; fall back to recorder body.
-	if public.Status == service.ImageTaskStatusCompleted && len(public.Result) > 0 {
-		c.Header("Cache-Control", "no-store")
-		c.Header("X-Sub2API-Image-Mode", "sync-via-async")
-		c.Header("X-Sub2API-Image-Task-Id", public.ID)
-		c.Data(http.StatusOK, "application/json; charset=utf-8", public.Result)
-		return
+
+	c.Header("Cache-Control", "no-store")
+	c.Header("X-Sub2API-Image-Mode", "sync-via-async")
+	c.Header("X-Sub2API-Image-Task-Id", task.ID)
+
+	if public.Status == service.ImageTaskStatusCompleted {
+		// Codex Desktop imagegen requires data[].b64_json. R2 rewrite strips it
+		// from the task store, so prefer the original recorder body for the
+		// synchronous client response (R2 copy remains available via task poll).
+		recorderBody := bytes.TrimSpace(recorder.Body.Bytes())
+		statusCode := recorder.Code
+		if statusCode == 0 {
+			statusCode = http.StatusOK
+		}
+		if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices && len(recorderBody) > 0 && json.Valid(recorderBody) {
+			c.Data(http.StatusOK, "application/json; charset=utf-8", recorderBody)
+			return
+		}
+		// Fallback: rehydrate b64 from R2 url if only the rewritten result remains.
+		if len(public.Result) > 0 {
+			body, rehydrateErr := service.EnsureImageResultHasB64JSON(c.Request.Context(), public.Result)
+			if rehydrateErr != nil {
+				logger.L().Warn("image_task.sync_via_async_rehydrate_failed",
+					zap.String("task_id", task.ID),
+					zap.Error(rehydrateErr),
+				)
+				c.Data(http.StatusOK, "application/json; charset=utf-8", public.Result)
+				return
+			}
+			c.Data(http.StatusOK, "application/json; charset=utf-8", body)
+			return
+		}
 	}
 	if public.Status == service.ImageTaskStatusFailed {
 		status := public.HTTPStatus
 		if status < http.StatusBadRequest {
 			status = http.StatusBadGateway
 		}
-		c.Header("Cache-Control", "no-store")
-		c.Header("X-Sub2API-Image-Mode", "sync-via-async")
-		c.Header("X-Sub2API-Image-Task-Id", public.ID)
 		if len(public.Error) > 0 && json.Valid(public.Error) {
 			c.Data(status, "application/json; charset=utf-8", []byte(`{"error":`+string(public.Error)+`}`))
 			return
