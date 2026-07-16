@@ -39,6 +39,8 @@ type OpenAIRecordUsageInput struct {
 	PricingAt time.Time
 	// CyberBlocked 为 true 时把该用量行标记为 cyber（request_type=cyber），计费逻辑不变。
 	CyberBlocked bool
+	// AsyncImageTask 为 true 时标记 request_type=async（图片异步任务或 sync-via-async 入口）。
+	AsyncImageTask bool
 	ChannelUsageFields
 }
 
@@ -331,6 +333,12 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	usageLog.Stream = result.Stream
 	if input.CyberBlocked {
 		usageLog.RequestType = RequestTypeCyberBlocked
+	} else if input.AsyncImageTask {
+		usageLog.RequestType = RequestTypeAsync
+	} else {
+		// Explicitly persist request_type so the admin UI does not fall back
+		// to treating unknown (0) non-stream rows as plain "sync".
+		usageLog.RequestType = RequestTypeFromLegacy(result.Stream, result.OpenAIWSMode)
 	}
 	usageLog.OpenAIWSMode = result.OpenAIWSMode
 	usageLog.DurationMs = &durationMs
