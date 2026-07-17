@@ -64,6 +64,10 @@ type OpenAIImagesRequest struct {
 	Multipart          bool
 	Model              string
 	ExplicitModel      bool
+	// PromptModel: OAuth/Responses 桥上负责理解提示词与调度 image_generation 的模型（默认 gpt-5.4-mini）
+	PromptModel string
+	// ReasoningEffort: 调度模型 reasoning.effort（默认 medium）
+	ReasoningEffort    string
 	Prompt             string
 	Stream             bool
 	N                  int
@@ -88,6 +92,82 @@ type OpenAIImagesRequest struct {
 	MaskUpload         *OpenAIImagesUpload
 	Body               []byte
 	bodyHash           string
+}
+
+// 允许客户端为图片桥选择的「提示词/调度」模型白名单。
+// 与 sub2api OpenAI 默认模型列表对齐（gpt-5.6 / 5.5 / 5.4 系等）。
+// NormalizeOpenAIImagesPromptModel 导出供 handler 日志使用。
+func NormalizeOpenAIImagesPromptModel(model string) string {
+	return normalizeOpenAIImagesPromptModel(model)
+}
+
+// NormalizeOpenAIImagesReasoningEffort 导出供 handler 日志使用。
+func NormalizeOpenAIImagesReasoningEffort(effort string, promptModel string) string {
+	return normalizeOpenAIImagesReasoningEffort(effort, promptModel)
+}
+
+func normalizeOpenAIImagesPromptModel(model string) string {
+	m := strings.TrimSpace(model)
+	if m == "" {
+		return openAIImagesResponsesMainModel
+	}
+	switch strings.ToLower(m) {
+	case "gpt-5.6", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+		"gpt-5.5", "gpt-5.5-codex",
+		"gpt-5.4", "gpt-5.4-mini", "gpt-5.4-2026-03-05",
+		"gpt-5.3", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-codex",
+		"gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini":
+		return m
+	default:
+		// 未知则回退默认，避免客户端注入任意 model 打挂上游
+		return openAIImagesResponsesMainModel
+	}
+}
+
+// effortsForOpenAIImagesPromptModel 不同调度模型支持的 reasoning.effort 集合不同。
+func effortsForOpenAIImagesPromptModel(promptModel string) []string {
+	m := strings.ToLower(strings.TrimSpace(promptModel))
+	switch {
+	case strings.HasPrefix(m, "gpt-4o"):
+		return []string{"low", "medium", "high"}
+	case strings.Contains(m, "mini"):
+		// Codex 5.4 Mini UI：轻度 / 中 / 高 / 极高
+		return []string{"low", "medium", "high", "xhigh"}
+	case strings.HasPrefix(m, "gpt-5.6"), strings.HasPrefix(m, "gpt-5.5"),
+		strings.HasPrefix(m, "gpt-5.4"), strings.HasPrefix(m, "gpt-5.3"),
+		strings.HasPrefix(m, "gpt-5.2"), strings.HasPrefix(m, "gpt-5.1"),
+		m == "gpt-5" || strings.HasPrefix(m, "gpt-5-codex"):
+		// 主力 5.x
+		return []string{"low", "medium", "high", "xhigh"}
+	default:
+		return []string{"low", "medium", "high"}
+	}
+}
+
+func normalizeOpenAIImagesReasoningEffort(effort string, promptModel string) string {
+	e := strings.ToLower(strings.TrimSpace(effort))
+	allowed := effortsForOpenAIImagesPromptModel(promptModel)
+	if e == "" {
+		// 默认：列表里有 medium 用 medium，否则取中间档
+		for _, a := range allowed {
+			if a == "medium" {
+				return "medium"
+			}
+		}
+		return allowed[len(allowed)/2]
+	}
+	for _, a := range allowed {
+		if e == a {
+			return e
+		}
+	}
+	// 不支持则回退到该模型可用的默认档
+	for _, a := range allowed {
+		if a == "medium" {
+			return "medium"
+		}
+	}
+	return allowed[0]
 }
 
 func (r *OpenAIImagesRequest) ModerationBody() []byte {
@@ -258,6 +338,20 @@ func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {
 	req.Moderation = strings.TrimSpace(gjson.GetBytes(body, "moderation").String())
 	req.InputFidelity = strings.TrimSpace(gjson.GetBytes(body, "input_fidelity").String())
 	req.Style = strings.TrimSpace(gjson.GetBytes(body, "style").String())
+	// 提示词/调度模型（OAuth Responses 桥）；别名: prompt_model | orchestrator_model
+	if pm := strings.TrimSpace(gjson.GetBytes(body, "prompt_model").String()); pm != "" {
+		req.PromptModel = pm
+	} else if pm := strings.TrimSpace(gjson.GetBytes(body, "orchestrator_model").String()); pm != "" {
+		req.PromptModel = pm
+	}
+	// reasoning effort：reasoning_effort | effort
+	if re := strings.TrimSpace(gjson.GetBytes(body, "reasoning_effort").String()); re != "" {
+		req.ReasoningEffort = re
+	} else if re := strings.TrimSpace(gjson.GetBytes(body, "effort").String()); re != "" {
+		req.ReasoningEffort = re
+	} else if re := strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String()); re != "" {
+		req.ReasoningEffort = re
+	}
 	req.HasMask = gjson.GetBytes(body, "mask").Exists()
 	if outputCompression := gjson.GetBytes(body, "output_compression"); outputCompression.Exists() {
 		if outputCompression.Type != gjson.Number {
@@ -409,6 +503,10 @@ func parseOpenAIImagesMultipartRequest(body []byte, contentType string, req *Ope
 		case "style":
 			req.Style = value
 			req.HasNativeOptions = true
+		case "prompt_model", "orchestrator_model":
+			req.PromptModel = value
+		case "reasoning_effort", "effort":
+			req.ReasoningEffort = value
 		case "output_compression":
 			n, err := strconv.Atoi(value)
 			if err != nil {
@@ -589,11 +687,15 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	if err := validateOpenAIImagesModel(upstreamModel); err != nil {
 		return nil, err
 	}
+	promptModel := normalizeOpenAIImagesPromptModel(parsed.PromptModel)
+	effort := normalizeOpenAIImagesReasoningEffort(parsed.ReasoningEffort, promptModel)
 	logger.LegacyPrintf(
 		"service.openai_gateway",
-		"[OpenAI] Images request routing request_model=%s upstream_model=%s endpoint=%s account_type=%s",
+		"[OpenAI] Images request routing request_model=%s upstream_model=%s prompt_model=%s effort=%s endpoint=%s account_type=%s",
 		strings.TrimSpace(parsed.Model),
 		upstreamModel,
+		promptModel,
+		effort,
 		parsed.Endpoint,
 		account.Type,
 	)

@@ -80,9 +80,30 @@ curl -i https://api.example.com/v1/images/generations/async \
   -d '{
     "model": "gpt-image-1",
     "prompt": "A lighthouse during a winter storm",
-    "size": "1536x1024"
+    "size": "1536x1024",
+    "prompt_model": "gpt-5.4-mini",
+    "reasoning_effort": "medium"
   }'
 ```
+
+### Optional: prompt orchestrator (ChatGPT / OAuth image bridge)
+
+On ChatGPT subscription / OAuth accounts, sub2api may route images through a Responses bridge:
+
+| Field | Meaning | Default |
+|-------|---------|---------|
+| `model` | Image tool model (`gpt-image-2`, …) | client / default image model |
+| `prompt_model` (alias `orchestrator_model`) | Text model that understands the prompt and calls `image_generation` | `gpt-5.4-mini` |
+| `reasoning_effort` (alias `effort`) | Reasoning effort for that text model | `medium` |
+
+Allowed `prompt_model` values (others fall back to default):  
+`gpt-5.6`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.5-codex`,  
+`gpt-5.4-mini`, `gpt-5.4`, `gpt-5.4-2026-03-05`, `gpt-5.3`, `gpt-5.2`, `gpt-5.1`, `gpt-5`, `gpt-5-mini`, `gpt-5-codex`,  
+`gpt-4.1`, `gpt-4.1-mini`, `gpt-4o`, `gpt-4o-mini`.
+
+Allowed `reasoning_effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`.
+
+These fields apply to the OAuth Responses path. Native API-key image routes may ignore them.
 
 The server stores the initial task in Redis and responds with `202 Accepted`:
 

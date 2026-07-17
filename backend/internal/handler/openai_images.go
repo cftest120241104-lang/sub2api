@@ -74,9 +74,15 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		return
 	}
 	requestModel := parsed.Model
+	promptModel := service.NormalizeOpenAIImagesPromptModel(parsed.PromptModel)
+	effort := service.NormalizeOpenAIImagesReasoningEffort(parsed.ReasoningEffort, promptModel)
 
 	reqLog = reqLog.With(
 		zap.String("model", requestModel),
+		zap.String("prompt_model", promptModel),
+		zap.String("effort", effort),
+		zap.String("prompt_model_raw", strings.TrimSpace(parsed.PromptModel)),
+		zap.String("effort_raw", strings.TrimSpace(parsed.ReasoningEffort)),
 		zap.Bool("stream", parsed.Stream),
 		zap.Bool("multipart", parsed.Multipart),
 		zap.String("capability", string(parsed.RequiredCapability)),
