@@ -354,8 +354,12 @@ func buildOpenAIImagesResponsesRequest(parsed *OpenAIImagesRequest, toolModel st
 		return nil, fmt.Errorf("image input is required")
 	}
 
+	promptModel := normalizeOpenAIImagesPromptModel(parsed.PromptModel)
+	effort := normalizeOpenAIImagesReasoningEffort(parsed.ReasoningEffort, promptModel)
+
 	req := []byte(`{"instructions":"","stream":true,"reasoning":{"effort":"medium","summary":"auto"},"parallel_tool_calls":true,"include":["reasoning.encrypted_content"],"model":"","store":false,"tool_choice":{"type":"image_generation"}}`)
-	req, _ = sjson.SetBytes(req, "model", openAIImagesResponsesMainModel)
+	req, _ = sjson.SetBytes(req, "model", promptModel)
+	req, _ = sjson.SetBytes(req, "reasoning.effort", effort)
 
 	input := []byte(`[{"type":"message","role":"user","content":[{"type":"input_text","text":""}]}]`)
 	input, _ = sjson.SetBytes(input, "0.content.0.text", prompt)
@@ -1679,10 +1683,14 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	if err := validateOpenAIImagesModel(requestModel); err != nil {
 		return nil, err
 	}
+	promptModel := normalizeOpenAIImagesPromptModel(parsed.PromptModel)
+	effort := normalizeOpenAIImagesReasoningEffort(parsed.ReasoningEffort, promptModel)
 	logger.LegacyPrintf(
 		"service.openai_gateway",
-		"[OpenAI] Images request routing request_model=%s endpoint=%s account_type=%s uploads=%d",
+		"[OpenAI] Images request routing request_model=%s prompt_model=%s effort=%s endpoint=%s account_type=%s uploads=%d",
 		requestModel,
+		promptModel,
+		effort,
 		parsed.Endpoint,
 		account.Type,
 		len(parsed.Uploads),

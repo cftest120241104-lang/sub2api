@@ -84,10 +84,16 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Model is not supported by this OpenAI-compatible endpoint for composite groups")
 		return
 	}
+	promptModel := service.NormalizeOpenAIImagesPromptModel(parsed.PromptModel)
+	effort := service.NormalizeOpenAIImagesReasoningEffort(parsed.ReasoningEffort, promptModel)
 
 	reqLog = reqLog.With(
 		zap.String("model", clientRequestModel),
 		zap.String("routing_model", routingModel),
+		zap.String("prompt_model", promptModel),
+		zap.String("effort", effort),
+		zap.String("prompt_model_raw", strings.TrimSpace(parsed.PromptModel)),
+		zap.String("effort_raw", strings.TrimSpace(parsed.ReasoningEffort)),
 		zap.Bool("stream", parsed.Stream),
 		zap.Bool("multipart", parsed.Multipart),
 		zap.String("capability", string(parsed.RequiredCapability)),
