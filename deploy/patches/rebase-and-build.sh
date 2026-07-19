@@ -33,6 +33,8 @@ ORIGIN_REMOTE="${ORIGIN_REMOTE:-origin}"
 FEATURE_BRANCH="${FEATURE_BRANCH:-feat/images-sync-via-async}"
 VERSION_SUFFIX="${VERSION_SUFFIX:-sync-via-async}"
 IMAGE_NAME="${IMAGE_NAME:-sub2api}"
+# 韩国中转机 evoxt-kr 为 x86_64；开发机若是 arm64 Mac，必须交叉构建 amd64
+PLATFORM="${PLATFORM:-linux/amd64}"
 GOPROXY="${GOPROXY:-https://goproxy.cn,direct}"
 GOSUMDB="${GOSUMDB:-sum.golang.google.cn}"
 UPSTREAM_URL_DEFAULT="https://github.com/Wei-Shaw/sub2api.git"
@@ -261,6 +263,7 @@ do_build() {
   log "镜像: ${primary_tag}  以及  ${alias_tag}"
 
   docker build \
+    --platform "${PLATFORM}" \
     -t "${primary_tag}" \
     -t "${alias_tag}" \
     --build-arg "VERSION=${full_ver}" \
