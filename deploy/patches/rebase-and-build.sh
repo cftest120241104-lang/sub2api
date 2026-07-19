@@ -276,12 +276,17 @@ do_build() {
 
   cat <<EOF
 
-下一步（韩国机，需你确认后再做）：
-  1. 把镜像推到你们仓库，或 docker save/load 到服务器
-  2. compose 的 image 改为: ${primary_tag}  或  ${alias_tag}
-  3. docker compose up -d
-  4. 确认 /api/v1/settings/public 的 version == ${full_ver}
-  5. 不要点管理后台「立即更新」（会下官方包丢掉定制）
+下一步（开发机构建 → 推韩国中转机）：
+  # 只传镜像到 evoxt-kr（默认不重启中转）
+  ./deploy/patches/push-image-to-server.sh ${primary_tag}
+
+  # 传镜像并在服务器 compose 目录切换（路径按现网）
+  ./deploy/patches/push-image-to-server.sh ${primary_tag} \\
+    --compose-dir /path/on/server --up
+
+  验收: curl -sS https://token.happyai.icu/api/v1/settings/public
+  期望 version == ${full_ver}
+  禁止点管理后台「立即更新」
 
 EOF
   export BUILT_VERSION="${full_ver}"
