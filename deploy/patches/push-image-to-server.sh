@@ -10,9 +10,9 @@
 #   # 只传镜像（load 到服务器，不改运行中的容器）
 #   ./deploy/patches/push-image-to-server.sh sub2api:0.1.161-sync-via-async
 #
-#   # 传镜像 + 在服务器 compose 目录 up -d（会重启中转，需确认路径）
+#   # 传镜像 + 切换中转（现网 compose 在 /opt/sub2api）
 #   ./deploy/patches/push-image-to-server.sh sub2api:0.1.161-sync-via-async \
-#     --compose-dir /opt/sub2api-deploy --up
+#     --compose-dir /opt/sub2api --up
 #
 #   # 指定 SSH（默认 evoxt-kr，见 ~/.ssh/config）
 #   SSH_HOST=evoxt-kr ./deploy/patches/push-image-to-server.sh sub2api:sync-via-async
