@@ -42,7 +42,16 @@ This change lives as a **small, isolated patch** on top of [Wei-Shaw/sub2api](ht
 | `routes/gateway.go` | route images through SubmitAndWait when enabled |
 | `wire_gen.go` | pass `cfg` into `NewAsyncImageHandler` |
 
-### 一键脚本（推荐，固化上次手搓流程）
+### 推荐部署模式：开发机构建 → 推韩国中转机
+
+中转**一直跑在服务器**（如 `evoxt-kr` / `token.happyai.icu`）。  
+开发机只做：跟官方 rebase + 打带定制的镜像，再推到服务器。
+
+```text
+官方 tag  →  开发机 rebase-and-build  →  push-image-to-server  →  韩国机 docker load / compose up
+```
+
+#### 1) 开发机：跟官方 + 打镜像
 
 ```bash
 # 跟官方最新 v* tag：备份分支 → fetch → rebase → 打镜像
@@ -51,7 +60,7 @@ This change lives as a **small, isolated patch** on top of [Wei-Shaw/sub2api](ht
 # 钉某个官方版本
 ./deploy/patches/rebase-and-build.sh v0.1.161
 
-# rebase 成功后 force-with-lease 推 fork
+# rebase 成功后 force-with-lease 推 fork（可选）
 ./deploy/patches/rebase-and-build.sh v0.1.161 --push
 
 # 已 rebase 好，只构建
@@ -63,9 +72,37 @@ This change lives as a **small, isolated patch** on top of [Wei-Shaw/sub2api](ht
 - `sub2api:0.1.161-sync-via-async`（带版本）
 - `sub2api:sync-via-async`（稳定别名，方便 compose）
 
+#### 2) 开发机：推到韩国中转机
+
+默认 SSH Host：`evoxt-kr`（见本机 `~/.ssh/config`）。
+
+```bash
+# 只 load 镜像，不重启（先安全传包）
+./deploy/patches/push-image-to-server.sh sub2api:0.1.161-sync-via-async
+
+# 确认 compose 的 image= 后，再切换运行中的中转
+./deploy/patches/push-image-to-server.sh sub2api:0.1.161-sync-via-async \
+  --compose-dir /服务器上的/compose目录 --up
+```
+
+#### 3) 验收（以服务器中转为准）
+
+```bash
+curl -sS https://token.happyai.icu/api/v1/settings/public \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"].get("version"))'
+# 期望: 0.1.161-sync-via-async
+```
+
+服务器配置保持：
+
+```yaml
+gateway:
+  images_sync_via_async: true
+```
+
 **不要**用管理后台「立即更新」：那会下官方 release 二进制，冲掉 fork 定制。
 
-脚本失败时会 `rebase --abort` 并保留 `backup/pre-rebase-...` 分支。
+`rebase-and-build.sh` 失败时会 `rebase --abort` 并保留 `backup/pre-rebase-...` 分支。
 
 ### Rebase workflow（手工，与脚本等价）
 
