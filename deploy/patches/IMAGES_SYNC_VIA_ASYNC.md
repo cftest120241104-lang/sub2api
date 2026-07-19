@@ -42,13 +42,39 @@ This change lives as a **small, isolated patch** on top of [Wei-Shaw/sub2api](ht
 | `routes/gateway.go` | route images through SubmitAndWait when enabled |
 | `wire_gen.go` | pass `cfg` into `NewAsyncImageHandler` |
 
-### Rebase workflow
+### 一键脚本（推荐，固化上次手搓流程）
+
+```bash
+# 跟官方最新 v* tag：备份分支 → fetch → rebase → 打镜像
+./deploy/patches/rebase-and-build.sh
+
+# 钉某个官方版本
+./deploy/patches/rebase-and-build.sh v0.1.161
+
+# rebase 成功后 force-with-lease 推 fork
+./deploy/patches/rebase-and-build.sh v0.1.161 --push
+
+# 已 rebase 好，只构建
+./deploy/patches/rebase-and-build.sh --build-only
+```
+
+产物镜像示例：
+
+- `sub2api:0.1.161-sync-via-async`（带版本）
+- `sub2api:sync-via-async`（稳定别名，方便 compose）
+
+**不要**用管理后台「立即更新」：那会下官方 release 二进制，冲掉 fork 定制。
+
+脚本失败时会 `rebase --abort` 并保留 `backup/pre-rebase-...` 分支。
+
+### Rebase workflow（手工，与脚本等价）
 
 ```bash
 git remote add upstream https://github.com/Wei-Shaw/sub2api.git   # once
-git fetch upstream
-git checkout feat/images-sync-via-async   # or main with patch commits
-git rebase upstream/main
+git fetch upstream --tags
+git checkout feat/images-sync-via-async
+git branch "backup/pre-rebase-$(date +%Y%m%d-%H%M%S)"
+git rebase v0.1.161   # 或 upstream/main
 # fix conflicts (usually only around gateway routes / NewAsyncImageHandler)
 git push --force-with-lease origin HEAD
 ```
@@ -58,7 +84,8 @@ Then rebuild/deploy the Docker image from this fork.
 ### Deploy (example)
 
 ```bash
-docker build -t sub2api:sync-via-async .
+# 脚本已构建时直接用 tag；否则：
+docker build -t sub2api:sync-via-async --build-arg VERSION=0.1.161-sync-via-async .
 # point compose image to the custom tag, set images_sync_via_async: true
 docker compose up -d app
 ```
