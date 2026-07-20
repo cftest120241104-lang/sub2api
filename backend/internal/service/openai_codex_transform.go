@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -285,6 +286,10 @@ func applyCodexOAuthTransformWithOptions(reqBody map[string]any, opts codexOAuth
 			PreserveReferences: needsToolContinuation,
 			PreserveCallIDs:    opts.PreserveToolCallIDs,
 		})
+		if sanitizedInput, modified := sanitizeInvalidCodexOutputImageURLs(input); modified {
+			input = sanitizedInput
+			result.Modified = true
+		}
 		reqBody["input"] = input
 		result.Modified = true
 	} else if inputStr, ok := reqBody["input"].(string); ok {
@@ -1355,6 +1360,69 @@ func filterCodexInput(input []any, preserveReferences bool) []any {
 	return filterCodexInputWithOptions(input, codexInputFilterOptions{
 		PreserveReferences: preserveReferences,
 	})
+}
+
+// sanitizeInvalidCodexOutputImageURLs 仅清理历史工具输出中上游无法解析的图片 URL。
+// 用户显式传入的 input_image 保持原样，避免改变正常的图片输入语义。
+func sanitizeInvalidCodexOutputImageURLs(input []any) ([]any, bool) {
+	sanitized := input
+	changed := false
+	for index, rawItem := range input {
+		item, ok := rawItem.(map[string]any)
+		if !ok {
+			continue
+		}
+		rawOutput, ok := item["output"]
+		if !ok {
+			continue
+		}
+		output, ok := rawOutput.([]any)
+		if !ok {
+			continue
+		}
+
+		filteredOutput := make([]any, 0, len(output))
+		modified := false
+		for _, rawPart := range output {
+			part, ok := rawPart.(map[string]any)
+			if ok {
+				if imageURL, exists := part["image_url"]; exists && !isValidCodexOutputImageURL(imageURL) {
+					modified = true
+					continue
+				}
+			}
+			filteredOutput = append(filteredOutput, rawPart)
+		}
+		if !modified {
+			continue
+		}
+		if !changed {
+			sanitized = append([]any(nil), input...)
+			changed = true
+		}
+		newItem := make(map[string]any, len(item))
+		for key, value := range item {
+			newItem[key] = value
+		}
+		newItem["output"] = filteredOutput
+		sanitized[index] = newItem
+	}
+	if !changed {
+		return input, false
+	}
+	return sanitized, true
+}
+
+func isValidCodexOutputImageURL(value any) bool {
+	rawURL, ok := value.(string)
+	if !ok {
+		return false
+	}
+	parsed, err := url.ParseRequestURI(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	return parsed.Scheme == "http" || parsed.Scheme == "https"
 }
 
 func filterCodexInputWithOptions(input []any, opts codexInputFilterOptions) []any {

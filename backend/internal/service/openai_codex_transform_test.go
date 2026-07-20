@@ -554,6 +554,57 @@ func TestFilterCodexInput_RemovesItemReferenceWhenNotPreserved(t *testing.T) {
 	require.False(t, hasID)
 }
 
+func TestSanitizeInvalidCodexOutputImageURLs(t *testing.T) {
+	invalidImage := map[string]any{
+		"type":      "output_image",
+		"image_url": "blob:codex-desktop-image",
+	}
+	input := []any{
+		map[string]any{
+			"type": "function_call_output",
+			"output": []any{
+				map[string]any{"type": "output_text", "text": "image already shown to the user"},
+				invalidImage,
+				map[string]any{"type": "output_image", "image_url": "https://images.example.test/generated.png"},
+			},
+		},
+		map[string]any{"type": "message", "content": "normal item between bad image outputs"},
+		map[string]any{
+			"type": "function_call_output",
+			"output": []any{
+				map[string]any{"type": "output_image", "image_url": "data:image/png;base64,invalid-for-output"},
+			},
+		},
+	}
+
+	sanitized, modified := sanitizeInvalidCodexOutputImageURLs(input)
+	require.True(t, modified)
+	require.Len(t, sanitized, 3)
+
+	item, ok := sanitized[0].(map[string]any)
+	require.True(t, ok)
+	output, ok := item["output"].([]any)
+	require.True(t, ok)
+	require.Len(t, output, 2)
+
+	validImage, ok := output[1].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "https://images.example.test/generated.png", validImage["image_url"])
+
+	middle, ok := sanitized[1].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "normal item between bad image outputs", middle["content"])
+
+	secondOutput, ok := sanitized[2].(map[string]any)
+	require.True(t, ok)
+	secondParts, ok := secondOutput["output"].([]any)
+	require.True(t, ok)
+	require.Empty(t, secondParts)
+
+	// 清洗必须使用副本，不能改写客户端原始请求体。
+	require.Equal(t, "blob:codex-desktop-image", invalidImage["image_url"])
+}
+
 func TestApplyCodexOAuthTransform_NormalizeCodexTools_PreservesResponsesFunctionTools(t *testing.T) {
 	reqBody := map[string]any{
 		"model": "gpt-5.1",
